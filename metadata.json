@@ -1,0 +1,6 @@
+{
+  "name": "MTR · La Bragadense",
+  "description": "Dashboard de posiciones y precios MTR / Rofex para La Bragadense",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

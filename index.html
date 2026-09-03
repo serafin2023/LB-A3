@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MTR · La Bragadense</title>
+<meta name="description" content="Dashboard de posiciones y precios MTR / Rofex para La Bragadense">
+<meta property="og:title" content="MTR · La Bragadense">
+<meta property="og:description" content="Dashboard de posiciones y precios MTR / Rofex para La Bragadense">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -2194,13 +2197,33 @@ function wireEvents(){
   render();
 })();
 </script>
-const firebaseConfig = {
-  apiKey: "AIzaSyBAoNfQdZUOv-DEfvuU7ZXOxy-NkoHXjXM",
-  authDomain: "lb-a3-6d8d5.firebaseapp.com",
-  projectId: "lb-a3-6d8d5",
-  storageBucket: "lb-a3-6d8d5.firebasestorage.app",
-  messagingSenderId: "11650083651",
-  appId: "1:11650083651:web:0971759842729327b69df6"
-};
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+
+  // Web app's Firebase configuration loaded securely from server or env
+  let firebaseApiKey = "";
+  try {
+    const res = await fetch('/api/config');
+    if (res.ok) {
+      const cfg = await res.json();
+      firebaseApiKey = cfg.firebaseApiKey || "";
+    }
+  } catch (e) {}
+
+  const firebaseConfig = {
+    apiKey: firebaseApiKey,
+    authDomain: "lb-a3-6d8d5.firebaseapp.com",
+    projectId: "lb-a3-6d8d5",
+    storageBucket: "lb-a3-6d8d5.firebasestorage.app",
+    messagingSenderId: "11650083651",
+    appId: "1:11650083651:web:0971759842729327b69df6"
+  };
+
+  // Initialize Firebase if configured
+  if (firebaseConfig.apiKey) {
+    const app = initializeApp(firebaseConfig);
+  }
+</script>
 </body>
 </html>
