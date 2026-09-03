@@ -1,0 +1,2198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MTR · La Bragadense</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --teal:#005457;
+    --teal-ink:#013638;
+    --green:#A4CC39;
+    --green-ink:#4C6B17;
+    --bg:#F3F5F1;
+    --surface:#FFFFFF;
+    --ink:#10231F;
+    --muted:#5B6B63;
+    --border:#DFE4DC;
+    --gain:#3C7A3E;
+    --gain-bg:#EAF3E4;
+    --loss:#A6432E;
+    --loss-bg:#FBEBE7;
+    --radius:8px;
+    --shadow:none;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Outfit',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    font-size:14px;
+    line-height:1.45;
+  }
+  ::selection{background:var(--green);color:var(--teal-ink);}
+  .app{display:flex;min-height:100vh;}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:216px;flex:none;background:var(--teal);color:#fff;
+    display:flex;flex-direction:column;padding:22px 14px;gap:6px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;padding:0 6px 22px;border-bottom:1px solid rgba(255,255,255,.18);margin-bottom:16px;}
+  .brand-dot{width:26px;height:26px;border-radius:50%;background:var(--green);flex:none;position:relative;}
+  .brand-dot::after{content:"";position:absolute;inset:6px;border:2px solid var(--teal);border-radius:50%;}
+  .brand-name{font-weight:700;font-size:14.5px;letter-spacing:.2px;line-height:1.15;}
+  .brand-sub{font-size:10.5px;color:rgba(255,255,255,.65);margin-top:1px;}
+  .navbtn{
+    display:flex;align-items:center;gap:10px;text-align:left;
+    background:transparent;border:none;color:rgba(255,255,255,.78);
+    font-family:inherit;font-size:13.5px;font-weight:500;
+    padding:10px 12px;border-radius:6px;cursor:pointer;transition:background .12s;
+  }
+  .navbtn:hover{background:rgba(255,255,255,.08);color:#fff;}
+  .navbtn.active{background:rgba(255,255,255,.14);color:#fff;box-shadow:inset 3px 0 0 var(--green);}
+  .navbtn svg{width:16px;height:16px;flex:none;}
+  .sidebar-foot{margin-top:auto;padding:10px 12px;font-size:11px;color:rgba(255,255,255,.5);border-top:1px solid rgba(255,255,255,.15);padding-top:14px;}
+
+  /* ---------- Main ---------- */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .topbar{
+    background:var(--surface);border-bottom:1px solid var(--border);
+    padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  }
+  .topbar h1{font-size:19px;margin:0;font-weight:700;color:var(--teal-ink);}
+  .topbar .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  .content{padding:24px 28px 60px;max-width:1360px;width:100%;margin:0;}
+
+  .btn{
+    font-family:inherit;font-size:13px;font-weight:600;border-radius:6px;border:1px solid transparent;
+    padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:filter .12s,background .12s;
+  }
+  .btn-primary{background:var(--teal);color:#fff;}
+  .btn-primary:hover{filter:brightness(1.08);}
+  .btn-accent{background:var(--green);color:var(--teal-ink);}
+  .btn-accent:hover{filter:brightness(1.05);}
+  .btn-ghost{background:transparent;color:var(--teal-ink);border-color:var(--border);}
+  .btn-ghost:hover{background:#EEF2ED;}
+  .btn-danger{background:transparent;color:var(--loss);border-color:var(--loss);}
+  .btn-danger:hover{background:var(--loss-bg);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btn-sm{padding:5px 10px;font-size:12px;}
+
+  /* ---------- Cards ---------- */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);}
+  .card-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .card-head h2{font-size:14.5px;margin:0;font-weight:700;color:var(--teal-ink);}
+  .card-head .hint{font-size:11.5px;color:var(--muted);}
+  .card-body{padding:16px 18px;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;position:relative;overflow:hidden;}
+  .kpi .accent{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--teal);}
+  .kpi.gain .accent{background:var(--gain);}
+  .kpi.loss .accent{background:var(--loss);}
+  .kpi-label{font-size:11.5px;color:var(--muted);font-weight:600;}
+  .kpi-value{font-size:24px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;color:var(--teal-ink);}
+  .kpi-value.gain{color:var(--gain);}
+  .kpi-value.loss{color:var(--loss);}
+  .kpi-note{font-size:11.5px;color:var(--muted);margin-top:4px;}
+
+  table{width:100%;border-collapse:collapse;font-size:12.8px;}
+  th{text-align:left;font-size:11px;text-transform:none;color:var(--muted);font-weight:700;padding:8px 10px;border-bottom:2px solid var(--border);white-space:nowrap;}
+  td{padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;font-variant-numeric:tabular-nums;}
+  tbody tr:hover{background:#F7F9F6;}
+  .num{text-align:right;}
+  .tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+  .tag-acopio{background:#E4EEEF;color:var(--teal-ink);}
+  .tag-siembras{background:#EFF5DD;color:var(--green-ink);}
+  .tag-fut{background:#EFF1EE;color:var(--muted);}
+  .tag-op{background:#F3ECE0;color:#8A5A20;}
+  .pill-compra{color:var(--gain);font-weight:700;}
+  .pill-venta{color:var(--loss);font-weight:700;}
+  .val-gain{color:var(--gain);font-weight:700;}
+  .val-loss{color:var(--loss);font-weight:700;}
+  .val-na{color:var(--muted);font-style:italic;font-weight:400;}
+  .row-closed{opacity:.5;}
+  .row-closed td{text-decoration:line-through;text-decoration-color:var(--muted);}
+
+  .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+  select,input[type=text],input[type=number],input[type=date]{
+    font-family:inherit;font-size:12.8px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--ink);
+  }
+  select:focus,input:focus{outline:2px solid var(--green);outline-offset:1px;}
+  label.field{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--muted);font-weight:600;}
+
+  .table-scroll{overflow-x:auto;}
+  .empty{padding:40px 20px;text-align:center;color:var(--muted);}
+  .empty h3{color:var(--teal-ink);margin-bottom:6px;}
+
+  .modal-backdrop{position:fixed;inset:0;background:rgba(16,35,31,.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:100;}
+  .modal{background:#fff;border-radius:10px;max-width:640px;width:100%;padding:22px 24px;}
+  .modal h3{margin:0 0 4px;color:var(--teal-ink);font-size:16px;}
+  .modal .modal-sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .form-grid .full{grid-column:1/-1;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--teal-ink);color:#fff;padding:12px 18px;border-radius:8px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.18);z-index:200;max-width:360px;}
+  .toast.err{background:var(--loss);}
+
+  .badge-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;}
+  .dropzone{border:1.5px dashed var(--border);border-radius:8px;padding:22px;text-align:center;color:var(--muted);font-size:12.8px;cursor:pointer;transition:border-color .15s,background .15s;}
+  .dropzone:hover,.dropzone.drag{border-color:var(--teal);background:#F1F6F5;}
+  .dropzone input{display:none;}
+  .source-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;background:#EFF3EC;border:1px solid var(--border);padding:4px 10px;border-radius:20px;color:var(--muted);}
+
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  @media (max-width:960px){
+    .sidebar{width:64px;padding:16px 8px;}
+    .brand-name,.brand-sub,.navbtn span{display:none;}
+    .navbtn{justify-content:center;}
+    .grid-2{grid-template-columns:1fr;}
+    .form-grid{grid-template-columns:1fr;}
+  }
+  .link-btn{background:none;border:none;color:var(--teal);font-weight:600;font-size:12.5px;cursor:pointer;padding:0;text-decoration:underline;}
+  .icon-btn{background:none;border:none;cursor:pointer;color:var(--muted);padding:4px;border-radius:4px;}
+  .icon-btn:hover{background:#EEF2ED;color:var(--loss);}
+  .small-muted{font-size:11.5px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div id="app" class="app"></div>
+<div id="toastHost"></div>
+
+<script>
+/* =========================================================================
+   ADAPTADOR DE ALMACENAMIENTO
+   Usa window.storage si está disponible (entorno Claude). Si el archivo se
+   abre suelto en un navegador (doble clic, sin ese entorno), usa localStorage
+   del navegador como respaldo, para que igual persista todo.
+========================================================================= */
+const storageAdapter = (typeof window!=='undefined' && window.storage && typeof window.storage.get==='function')
+  ? window.storage
+  : {
+      async get(key){
+        const v = window.localStorage.getItem(key);
+        if(v===null) throw new Error('missing');
+        return {key, value:v};
+      },
+      async set(key, value){ window.localStorage.setItem(key, value); return {key, value}; },
+      async delete(key){ window.localStorage.removeItem(key); return {key, deleted:true}; },
+      async list(prefix){
+        const keys = Object.keys(window.localStorage).filter(k=> !prefix || k.startsWith(prefix));
+        return {keys};
+      }
+    };
+
+/* =========================================================================
+   DATOS INICIALES (de tu archivo MTR_Rofex_Posi.xlsx)
+   Se usan solo la primera vez que se abre el dashboard en este navegador
+   (si ya guardaste datos, no se pisan). Podés borrarlos desde "Posiciones".
+========================================================================= */
+const SEED_POSITIONS = [{"id": "p_mtk1c1im_ui31a0", "cartera": "Acopio", "instrumento": "Futuro", "grano": "Soja", "operacion": "Venta", "vencimiento": "2026-11", "tipoOpcion": "", "strike": 0, "toneladas": 600, "apertura": 356.74, "estrategia": "", "estrategiaId": null, "referencia": "1)", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1in_ow7lyi", "cartera": "Acopio", "instrumento": "Futuro", "grano": "Soja", "operacion": "Compra", "vencimiento": "2027-05", "tipoOpcion": "", "strike": 0, "toneladas": 1200, "apertura": 342.825, "estrategia": "", "estrategiaId": null, "referencia": "7)", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1in_gf2a6y", "cartera": "Acopio", "instrumento": "Futuro", "grano": "Soja", "operacion": "Venta", "vencimiento": "2027-05", "tipoOpcion": "", "strike": 0, "toneladas": 500, "apertura": 339.1, "estrategia": "", "estrategiaId": null, "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1in_rdh97s", "cartera": "Acopio", "instrumento": "Futuro", "grano": "Maiz", "operacion": "Compra", "vencimiento": "2027-04", "tipoOpcion": "", "strike": 0, "toneladas": 500, "apertura": 200.8, "estrategia": "", "estrategiaId": null, "referencia": "8)", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1io_mtpe9l", "cartera": "Siembras", "instrumento": "Opcion", "grano": "Soja", "operacion": "Compra", "vencimiento": "2026-11", "tipoOpcion": "Put", "strike": 328, "toneladas": 1000, "apertura": 7, "estrategia": "", "estrategiaId": null, "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1io_5bwcq9", "cartera": "Siembras", "instrumento": "Opcion", "grano": "Soja", "operacion": "Compra", "vencimiento": "2027-05", "tipoOpcion": "Call", "strike": 356, "toneladas": 1000, "apertura": 4.9, "estrategia": "", "estrategiaId": null, "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1io_yczgcd", "cartera": "Siembras", "instrumento": "Opcion", "grano": "Soja", "operacion": "Compra", "vencimiento": "2027-05", "tipoOpcion": "Call", "strike": 360, "toneladas": 1000, "apertura": 4.1, "estrategia": "", "estrategiaId": null, "referencia": "2)", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1io_w0v2by", "cartera": "Siembras", "instrumento": "Opcion", "grano": "Soja", "operacion": "Compra", "vencimiento": "2027-05", "tipoOpcion": "Call", "strike": 364, "toneladas": 1000, "apertura": 6.5, "estrategia": "", "estrategiaId": null, "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1io_edyp7l", "cartera": "Siembras", "instrumento": "Opcion", "grano": "Soja", "operacion": "Compra", "vencimiento": "2027-07", "tipoOpcion": "Put", "strike": 336, "toneladas": 2000, "apertura": 6, "estrategia": "", "estrategiaId": null, "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1io_8bez0h", "cartera": "Siembras", "instrumento": "Opcion", "grano": "Trigo", "operacion": "Compra", "vencimiento": "2026-12", "tipoOpcion": "Call", "strike": 236, "toneladas": 1000, "apertura": 5.85, "estrategia": "", "estrategiaId": null, "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1io_edcvd8", "cartera": "Siembras", "instrumento": "Opcion", "grano": "Trigo", "operacion": "Compra", "vencimiento": "2027-01", "tipoOpcion": "Call", "strike": 236, "toneladas": 1000, "apertura": 5, "estrategia": "", "estrategiaId": null, "referencia": "1)", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1io_bb75rw", "cartera": "Acopio", "instrumento": "Futuro", "grano": "Soja", "operacion": "Venta", "vencimiento": "2026-11", "tipoOpcion": "", "strike": 0, "toneladas": 2600, "apertura": 348.03, "estrategia": "2) Put Sintético", "estrategiaId": "p_mtk1c1io_yx8umw", "referencia": "2)", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1is_lqj4or", "cartera": "Acopio", "instrumento": "Opcion", "grano": "Soja", "operacion": "Compra", "vencimiento": "2026-11", "tipoOpcion": "Call", "strike": 360, "toneladas": 1000, "apertura": 5.7, "estrategia": "2) Put Sintético", "estrategiaId": "p_mtk1c1io_yx8umw", "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1is_4t0s3b", "cartera": "Acopio", "instrumento": "Opcion", "grano": "Soja", "operacion": "Compra", "vencimiento": "2026-11", "tipoOpcion": "Call", "strike": 376, "toneladas": 1500, "apertura": 6, "estrategia": "2) Put Sintético", "estrategiaId": "p_mtk1c1io_yx8umw", "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1is_d35tq1", "cartera": "Acopio", "instrumento": "Futuro", "grano": "Soja", "operacion": "Venta", "vencimiento": "2027-05", "tipoOpcion": "", "strike": 0, "toneladas": 1000, "apertura": 332, "estrategia": "3) Put Sintético", "estrategiaId": "p_mtk1c1is_fpklvq", "referencia": "3)", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1is_yx05r9", "cartera": "Acopio", "instrumento": "Opcion", "grano": "Soja", "operacion": "Compra", "vencimiento": "2027-05", "tipoOpcion": "Call", "strike": 364, "toneladas": 1000, "apertura": 6.5, "estrategia": "3) Put Sintético", "estrategiaId": "p_mtk1c1is_fpklvq", "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1is_wxn96k", "cartera": "Acopio", "instrumento": "Futuro", "grano": "Maiz", "operacion": "Compra", "vencimiento": "2026-12", "tipoOpcion": "", "strike": 0, "toneladas": 1000, "apertura": 196.3, "estrategia": "4) Pase Compra/Venta", "estrategiaId": "p_mtk1c1is_dqv6ww", "referencia": "4)", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1is_7ix0k0", "cartera": "Acopio", "instrumento": "Futuro", "grano": "Maiz", "operacion": "Venta", "vencimiento": "2027-04", "tipoOpcion": "", "strike": 0, "toneladas": 1000, "apertura": 195, "estrategia": "4) Pase Compra/Venta", "estrategiaId": "p_mtk1c1is_dqv6ww", "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1is_wafz90", "cartera": "Siembras", "instrumento": "Futuro", "grano": "Soja", "operacion": "Venta", "vencimiento": "2026-11", "tipoOpcion": "", "strike": 0, "toneladas": 1500, "apertura": 346.63, "estrategia": "Estrategia 1", "estrategiaId": "p_mtk1c1is_jv7xit", "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1is_fudlk1", "cartera": "Siembras", "instrumento": "Opcion", "grano": "Soja", "operacion": "Compra", "vencimiento": "2026-11", "tipoOpcion": "Call", "strike": 360, "toneladas": 1000, "apertura": 5.7, "estrategia": "Estrategia 1", "estrategiaId": "p_mtk1c1is_jv7xit", "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1is_daxdf4", "cartera": "Siembras", "instrumento": "Opcion", "grano": "Soja", "operacion": "Compra", "vencimiento": "2026-11", "tipoOpcion": "Call", "strike": 376, "toneladas": 500, "apertura": 6, "estrategia": "Estrategia 1", "estrategiaId": "p_mtk1c1is_jv7xit", "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1is_k6s1k7", "cartera": "Siembras", "instrumento": "Opcion", "grano": "Soja", "operacion": "Compra", "vencimiento": "2026-11", "tipoOpcion": "Put", "strike": 324, "toneladas": 1000, "apertura": 5.9, "estrategia": "Estrategia 2", "estrategiaId": "p_mtk1c1is_ugutp5", "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}, {"id": "p_mtk1c1is_njy9gn", "cartera": "Siembras", "instrumento": "Opcion", "grano": "Soja", "operacion": "Venta", "vencimiento": "2026-11", "tipoOpcion": "Call", "strike": 352, "toneladas": 1000, "apertura": 6.2, "estrategia": "Estrategia 2", "estrategiaId": "p_mtk1c1is_ugutp5", "referencia": "", "notas": "", "estado": "Abierta", "origen": "importado", "fechaAlta": "2026-09-02", "cierreManual": null, "fechaCierre": null, "precioCierreOperacion": null}];
+const SEED_PRICES = {"CRN.CME/NOV26": {"ajuste": 210.7, "fuente": "archivo"}, "CRN.CME/FEB27": {"ajuste": 215.7, "fuente": "archivo"}, "CRN.CME/ABR27": {"ajuste": 218.8, "fuente": "archivo"}, "CRN.CME/JUN27": {"ajuste": 219, "fuente": "archivo"}, "CRN.CME/AGO27": {"ajuste": 207.7, "fuente": "archivo"}, "CRN.CME/NOV27": {"ajuste": 207.5, "fuente": "archivo"}, "GIR.ROS.P/DIS26": {"ajuste": 750000, "fuente": "archivo"}, "MAI.ROS/DIS26": {"ajuste": 191.5, "fuente": "archivo"}, "MAI.ROS/SEP26": {"ajuste": 198, "fuente": "archivo"}, "MAI.ROS/NOV26": {"ajuste": 201, "fuente": "archivo"}, "MAI.ROS/DIC26": {"ajuste": 208.9, "fuente": "archivo"}, "MAI.ROS/ENE27": {"ajuste": 211, "fuente": "archivo"}, "MAI.ROS/MAR27": {"ajuste": 207.6, "fuente": "archivo"}, "MAI.ROS/ABR27": {"ajuste": 208.5, "fuente": "archivo"}, "MAI.ROS/JUL27": {"ajuste": 204.7, "fuente": "archivo"}, "MAI.ROS/SEP27": {"ajuste": 207.8, "fuente": "archivo"}, "MAI.ROS/DIC27": {"ajuste": 211.1, "fuente": "archivo"}, "MAI.MIN/SEP26": {"ajuste": 198, "fuente": "archivo"}, "MAI.MIN/DIC26": {"ajuste": 208.9, "fuente": "archivo"}, "MAI.MIN/ABR27": {"ajuste": 208.5, "fuente": "archivo"}, "MAI.MIN/JUL27": {"ajuste": 204.7, "fuente": "archivo"}, "MAI.ROS.P/DIS26": {"ajuste": 290000, "fuente": "archivo"}, "SOJ.ROS/DIS26": {"ajuste": 363.5, "fuente": "archivo"}, "SOJ.ROS/SEP26": {"ajuste": 364, "fuente": "archivo"}, "SOJ.ROS/NOV26": {"ajuste": 370.5, "fuente": "archivo"}, "SOJ.ROS/ENE27": {"ajuste": 372.5, "fuente": "archivo"}, "SOJ.ROS/MAY27": {"ajuste": 356, "fuente": "archivo"}, "SOJ.ROS/JUL27": {"ajuste": 362.2, "fuente": "archivo"}, "SOJ.MIN/NOV26": {"ajuste": 370.5, "fuente": "archivo"}, "SOJ.MIN/MAY27": {"ajuste": 356, "fuente": "archivo"}, "SOJ.MIN/JUL27": {"ajuste": 362.2, "fuente": "archivo"}, "SOJ.ROS.P/DIS26": {"ajuste": 550000, "fuente": "archivo"}, "SOR.ROS/DIS26": {"ajuste": 182, "fuente": "archivo"}, "SOR.ROS.P/DIS26": {"ajuste": 275000, "fuente": "archivo"}, "SOY.CME/OCT26": {"ajuste": 473.1, "fuente": "archivo"}, "SOY.CME/DIC26": {"ajuste": 479.2, "fuente": "archivo"}, "SOY.CME/ABR27": {"ajuste": 481.7, "fuente": "archivo"}, "SOY.CME/JUN27": {"ajuste": 482.5, "fuente": "archivo"}, "TRI.ROS/DIS26": {"ajuste": 234.5, "fuente": "archivo"}, "TRI.ROS/SEP26": {"ajuste": 242, "fuente": "archivo"}, "TRI.ROS/NOV26": {"ajuste": 241.5, "fuente": "archivo"}, "TRI.ROS/DIC26": {"ajuste": 241, "fuente": "archivo"}, "TRI.ROS/ENE27": {"ajuste": 245.5, "fuente": "archivo"}, "TRI.ROS/MAR27": {"ajuste": 251.2, "fuente": "archivo"}, "TRI.MIN/DIC26": {"ajuste": 241, "fuente": "archivo"}, "TRI.MIN/ENE27": {"ajuste": 245.5, "fuente": "archivo"}, "TRI.MIN/MAR27": {"ajuste": 251.2, "fuente": "archivo"}, "TRI.BA.P/DIS26": {"ajuste": 325000, "fuente": "archivo"}, "TRI.ROS.P/DIS26": {"ajuste": 355000, "fuente": "archivo"}, "CRN.CME/NOV26 185 C": {"ajuste": 26.815025, "fuente": "archivo"}, "CRN.CME/NOV26 193 C": {"ajuste": 20.328104, "fuente": "archivo"}, "CRN.CME/NOV26 197 C": {"ajuste": 17.406963, "fuente": "archivo"}, "CRN.CME/NOV26 199 C": {"ajuste": 16.037646, "fuente": "archivo"}, "CRN.CME/NOV26 201 C": {"ajuste": 14.732212, "fuente": "archivo"}, "CRN.CME/NOV26 217 C": {"ajuste": 6.688564, "fuente": "archivo"}, "CRN.CME/NOV26 219 C": {"ajuste": 5.975572, "fuente": "archivo"}, "CRN.CME/NOV26 229 C": {"ajuste": 3.246423, "fuente": "archivo"}, "CRN.CME/FEB27 237 C": {"ajuste": 5.72051, "fuente": "archivo"}, "CRN.CME/ABR27 216 C": {"ajuste": 16.673265, "fuente": "archivo"}, "CRN.CME/ABR27 217 C": {"ajuste": 16.197868, "fuente": "archivo"}, "CRN.CME/ABR27 237 C": {"ajuste": 8.662799, "fuente": "archivo"}, "CRN.CME/ABR27 244 C": {"ajuste": 6.818888, "fuente": "archivo"}, "CRN.CME/JUN27 227 C": {"ajuste": 14.666617, "fuente": "archivo"}, "CRN.CME/JUN27 236 C": {"ajuste": 11.553106, "fuente": "archivo"}, "CRN.CME/JUN27 244 C": {"ajuste": 9.259344, "fuente": "archivo"}, "CRN.CME/JUN27 252 C": {"ajuste": 7.36058, "fuente": "archivo"}, "CRN.CME/JUN27 256 C": {"ajuste": 6.543548, "fuente": "archivo"}, "CRN.CME/JUN27 268 C": {"ajuste": 4.547543, "fuente": "archivo"}, "CRN.CME/JUN27 272 C": {"ajuste": 4.014255, "fuente": "archivo"}, "MAI.ROS/DIC26 188 C": {"ajuste": 20.906315, "fuente": "archivo"}, "MAI.ROS/DIC26 192 C": {"ajuste": 17.184807, "fuente": "archivo"}, "MAI.ROS/DIC26 196 C": {"ajuste": 13.677852, "fuente": "archivo"}, "MAI.ROS/DIC26 200 C": {"ajuste": 10.486363, "fuente": "archivo"}, "MAI.ROS/DIC26 204 C": {"ajuste": 7.706388, "fuente": "archivo"}, "MAI.ROS/DIC26 208 C": {"ajuste": 5.405895, "fuente": "archivo"}, "MAI.ROS/DIC26 212 C": {"ajuste": 3.607549, "fuente": "archivo"}, "MAI.ROS/DIC26 216 C": {"ajuste": 2.284625, "fuente": "archivo"}, "MAI.ROS/DIC26 220 C": {"ajuste": 1.370794, "fuente": "archivo"}, "MAI.ROS/DIC26 224 C": {"ajuste": 0.778624, "fuente": "archivo"}, "MAI.ROS/DIC26 228 C": {"ajuste": 0.418608, "fuente": "archivo"}, "MAI.ROS/ABR27 188 C": {"ajuste": 20.907166, "fuente": "archivo"}, "MAI.ROS/ABR27 192 C": {"ajuste": 17.548588, "fuente": "archivo"}, "MAI.ROS/ABR27 196 C": {"ajuste": 14.438906, "fuente": "archivo"}, "MAI.ROS/ABR27 200 C": {"ajuste": 11.627516, "fuente": "archivo"}, "MAI.ROS/ABR27 204 C": {"ajuste": 9.152039, "fuente": "archivo"}, "MAI.ROS/ABR27 208 C": {"ajuste": 7.033393, "fuente": "archivo"}, "MAI.ROS/ABR27 212 C": {"ajuste": 5.273217, "fuente": "archivo"}, "MAI.ROS/ABR27 216 C": {"ajuste": 3.855021, "fuente": "archivo"}, "MAI.ROS/ABR27 220 C": {"ajuste": 2.747175, "fuente": "archivo"}, "MAI.ROS/ABR27 224 C": {"ajuste": 1.908199, "fuente": "archivo"}, "MAI.ROS/ABR27 228 C": {"ajuste": 1.292084, "fuente": "archivo"}, "MAI.ROS/ABR27 232 C": {"ajuste": 0.853113, "fuente": "archivo"}, "MAI.ROS/ABR27 236 C": {"ajuste": 0.549468, "fuente": "archivo"}, "MAI.ROS/JUL27 180 C": {"ajuste": 24.7, "fuente": "archivo"}, "MAI.ROS/JUL27 184 C": {"ajuste": 21.122418, "fuente": "archivo"}, "MAI.ROS/JUL27 188 C": {"ajuste": 17.865218, "fuente": "archivo"}, "MAI.ROS/JUL27 192 C": {"ajuste": 14.850704, "fuente": "archivo"}, "MAI.ROS/JUL27 196 C": {"ajuste": 12.118995, "fuente": "archivo"}, "MAI.ROS/JUL27 200 C": {"ajuste": 9.699676, "fuente": "archivo"}, "MAI.ROS/JUL27 204 C": {"ajuste": 7.608565, "fuente": "archivo"}, "MAI.ROS/JUL27 208 C": {"ajuste": 5.846135, "fuente": "archivo"}, "MAI.ROS/JUL27 212 C": {"ajuste": 4.398646, "fuente": "archivo"}, "MAI.ROS/JUL27 216 C": {"ajuste": 3.240284, "fuente": "archivo"}, "MAI.ROS/JUL27 220 C": {"ajuste": 2.337029, "fuente": "archivo"}, "MAI.ROS/JUL27 224 C": {"ajuste": 1.650545, "fuente": "archivo"}, "MAI.ROS/JUL27 228 C": {"ajuste": 1.141793, "fuente": "archivo"}, "MAI.ROS/JUL27 232 C": {"ajuste": 0.773925, "fuente": "archivo"}, "SOJ.ROS/NOV26 324 C": {"ajuste": 46.5, "fuente": "archivo"}, "SOJ.ROS/NOV26 332 C": {"ajuste": 38.5, "fuente": "archivo"}, "SOJ.ROS/NOV26 336 C": {"ajuste": 34.5, "fuente": "archivo"}, "SOJ.ROS/NOV26 340 C": {"ajuste": 30.533871, "fuente": "archivo"}, "SOJ.ROS/NOV26 344 C": {"ajuste": 26.738222, "fuente": "archivo"}, "SOJ.ROS/NOV26 348 C": {"ajuste": 23.058931, "fuente": "archivo"}, "SOJ.ROS/NOV26 352 C": {"ajuste": 19.543644, "fuente": "archivo"}, "SOJ.ROS/NOV26 356 C": {"ajuste": 16.245266, "fuente": "archivo"}, "SOJ.ROS/NOV26 360 C": {"ajuste": 13.21663, "fuente": "archivo"}, "SOJ.ROS/NOV26 364 C": {"ajuste": 10.50401, "fuente": "archivo"}, "SOJ.ROS/NOV26 368 C": {"ajuste": 8.140886, "fuente": "archivo"}, "SOJ.ROS/NOV26 372 C": {"ajuste": 6.143348, "fuente": "archivo"}, "SOJ.ROS/NOV26 376 C": {"ajuste": 4.508021, "fuente": "archivo"}, "SOJ.ROS/NOV26 380 C": {"ajuste": 3.213276, "fuente": "archivo"}, "SOJ.ROS/NOV26 384 C": {"ajuste": 2.222904, "fuente": "archivo"}, "SOJ.ROS/MAY27 328 C": {"ajuste": 29.477321, "fuente": "archivo"}, "SOJ.ROS/MAY27 332 C": {"ajuste": 26.291951, "fuente": "archivo"}, "SOJ.ROS/MAY27 336 C": {"ajuste": 23.271992, "fuente": "archivo"}, "SOJ.ROS/MAY27 340 C": {"ajuste": 20.43477, "fuente": "archivo"}, "SOJ.ROS/MAY27 344 C": {"ajuste": 17.794869, "fuente": "archivo"}, "SOJ.ROS/MAY27 348 C": {"ajuste": 15.36339, "fuente": "archivo"}, "SOJ.ROS/MAY27 352 C": {"ajuste": 13.14745, "fuente": "archivo"}, "SOJ.ROS/MAY27 356 C": {"ajuste": 11.149923, "fuente": "archivo"}, "SOJ.ROS/MAY27 360 C": {"ajuste": 9.369068, "fuente": "archivo"}, "SOJ.ROS/MAY27 364 C": {"ajuste": 7.79948, "fuente": "archivo"}, "SOJ.ROS/MAY27 368 C": {"ajuste": 6.431816, "fuente": "archivo"}, "SOJ.ROS/MAY27 372 C": {"ajuste": 5.253751, "fuente": "archivo"}, "SOJ.ROS/MAY27 376 C": {"ajuste": 4.250665, "fuente": "archivo"}, "SOJ.ROS/MAY27 380 C": {"ajuste": 3.406371, "fuente": "archivo"}, "SOJ.ROS/MAY27 384 C": {"ajuste": 2.703844, "fuente": "archivo"}, "SOJ.ROS/MAY27 388 C": {"ajuste": 2.1259, "fuente": "archivo"}, "SOJ.ROS/JUL27 344 C": {"ajuste": 22.764844, "fuente": "archivo"}, "SOJ.ROS/JUL27 352 C": {"ajuste": 17.643293, "fuente": "archivo"}, "SOJ.ROS/JUL27 360 C": {"ajuste": 13.291009, "fuente": "archivo"}, "SOJ.ROS/JUL27 364 C": {"ajuste": 11.409582, "fuente": "archivo"}, "SOJ.ROS/JUL27 368 C": {"ajuste": 9.72155, "fuente": "archivo"}, "SOJ.ROS/JUL27 372 C": {"ajuste": 8.221073, "fuente": "archivo"}, "SOJ.ROS/JUL27 380 C": {"ajuste": 5.74661, "fuente": "archivo"}, "SOY.CME/OCT26 426 C": {"ajuste": 47.730311, "fuente": "archivo"}, "SOY.CME/OCT26 430 C": {"ajuste": 44.074008, "fuente": "archivo"}, "SOY.CME/OCT26 441 C": {"ajuste": 34.512291, "fuente": "archivo"}, "SOY.CME/OCT26 456 C": {"ajuste": 23.093476, "fuente": "archivo"}, "SOY.CME/OCT26 460 C": {"ajuste": 20.443091, "fuente": "archivo"}, "SOY.CME/OCT26 463 C": {"ajuste": 18.576153, "fuente": "archivo"}, "SOY.CME/OCT26 467 C": {"ajuste": 16.252728, "fuente": "archivo"}, "SOY.CME/OCT26 471 C": {"ajuste": 14.121801, "fuente": "archivo"}, "SOY.CME/OCT26 474 C": {"ajuste": 12.650315, "fuente": "archivo"}, "SOY.CME/OCT26 478 C": {"ajuste": 10.855529, "fuente": "archivo"}, "SOY.CME/OCT26 482 C": {"ajuste": 9.247892, "fuente": "archivo"}, "SOY.CME/OCT26 485 C": {"ajuste": 8.160905, "fuente": "archivo"}, "SOY.CME/OCT26 489 C": {"ajuste": 6.862896, "fuente": "archivo"}, "SOY.CME/OCT26 496 C": {"ajuste": 4.97755, "fuente": "archivo"}, "SOY.CME/OCT26 503 C": {"ajuste": 3.52761, "fuente": "archivo"}, "SOY.CME/DIC26 496 C": {"ajuste": 12.118634, "fuente": "archivo"}, "SOY.CME/DIC26 522 C": {"ajuste": 5.435943, "fuente": "archivo"}, "SOY.CME/DIC26 530 C": {"ajuste": 4.137409, "fuente": "archivo"}, "SOY.CME/DIC26 537 C": {"ajuste": 3.226178, "fuente": "archivo"}, "SOY.CME/ABR27 478 C": {"ajuste": 28.664819, "fuente": "archivo"}, "SOY.CME/ABR27 514 C": {"ajuste": 14.854973, "fuente": "archivo"}, "SOY.CME/ABR27 551 C": {"ajuste": 6.789039, "fuente": "archivo"}, "SOY.CME/JUN27 551 C": {"ajuste": 9.33364, "fuente": "archivo"}, "TRI.ROS/DIC26 200 C": {"ajuste": 41, "fuente": "archivo"}, "TRI.ROS/DIC26 204 C": {"ajuste": 37, "fuente": "archivo"}, "TRI.ROS/DIC26 208 C": {"ajuste": 33, "fuente": "archivo"}, "TRI.ROS/DIC26 212 C": {"ajuste": 29.061804, "fuente": "archivo"}, "TRI.ROS/DIC26 216 C": {"ajuste": 25.346588, "fuente": "archivo"}, "TRI.ROS/DIC26 220 C": {"ajuste": 21.775147, "fuente": "archivo"}, "TRI.ROS/DIC26 224 C": {"ajuste": 18.396149, "fuente": "archivo"}, "TRI.ROS/DIC26 228 C": {"ajuste": 15.259295, "fuente": "archivo"}, "TRI.ROS/DIC26 232 C": {"ajuste": 12.409734, "fuente": "archivo"}, "TRI.ROS/DIC26 236 C": {"ajuste": 9.882532, "fuente": "archivo"}, "TRI.ROS/DIC26 240 C": {"ajuste": 7.698437, "fuente": "archivo"}, "TRI.ROS/DIC26 244 C": {"ajuste": 5.861465, "fuente": "archivo"}, "TRI.ROS/DIC26 248 C": {"ajuste": 4.359354, "fuente": "archivo"}, "TRI.ROS/DIC26 252 C": {"ajuste": 3.165723, "fuente": "archivo"}, "TRI.ROS/DIC26 256 C": {"ajuste": 2.24422, "fuente": "archivo"}, "TRI.ROS/DIC26 260 C": {"ajuste": 1.553037, "fuente": "archivo"}, "TRI.ROS/DIC26 264 C": {"ajuste": 1.049217, "fuente": "archivo"}, "TRI.ROS/ENE27 212 C": {"ajuste": 33.5, "fuente": "archivo"}, "TRI.ROS/ENE27 220 C": {"ajuste": 26.110346, "fuente": "archivo"}, "TRI.ROS/ENE27 224 C": {"ajuste": 22.660831, "fuente": "archivo"}, "TRI.ROS/ENE27 228 C": {"ajuste": 19.404989, "fuente": "archivo"}, "TRI.ROS/ENE27 232 C": {"ajuste": 16.379846, "fuente": "archivo"}, "TRI.ROS/ENE27 236 C": {"ajuste": 13.617432, "fuente": "archivo"}, "TRI.ROS/ENE27 240 C": {"ajuste": 11.141726, "fuente": "archivo"}, "TRI.ROS/ENE27 244 C": {"ajuste": 8.966521, "fuente": "archivo"}, "TRI.ROS/ENE27 248 C": {"ajuste": 7.094251, "fuente": "archivo"}, "TRI.ROS/ENE27 252 C": {"ajuste": 5.516427, "fuente": "archivo"}, "TRI.ROS/ENE27 256 C": {"ajuste": 4.017151, "fuente": "archivo"}, "TRI.ROS/ENE27 260 C": {"ajuste": 3.164038, "fuente": "archivo"}, "TRI.ROS/ENE27 264 C": {"ajuste": 2.333613, "fuente": "archivo"}, "TRI.ROS/MAR27 232 C": {"ajuste": 21.162027, "fuente": "archivo"}, "TRI.ROS/MAR27 236 C": {"ajuste": 18.150468, "fuente": "archivo"}, "TRI.ROS/MAR27 244 C": {"ajuste": 12.857147, "fuente": "archivo"}, "TRI.ROS/MAR27 248 C": {"ajuste": 10.6086, "fuente": "archivo"}, "TRI.ROS/MAR27 252 C": {"ajuste": 8.634235, "fuente": "archivo"}, "CRN.CME/NOV26 157 P": {"ajuste": 0.027628, "fuente": "archivo"}, "CRN.CME/NOV26 161 P": {"ajuste": 0.056145, "fuente": "archivo"}, "CRN.CME/NOV26 165 P": {"ajuste": 0.107612, "fuente": "archivo"}, "CRN.CME/NOV26 173 P": {"ajuste": 0.33755, "fuente": "archivo"}, "MAI.ROS/DIC26 172 P": {"ajuste": 0.00397, "fuente": "archivo"}, "MAI.ROS/DIC26 176 P": {"ajuste": 0.013696, "fuente": "archivo"}, "MAI.ROS/DIC26 180 P": {"ajuste": 0.041245, "fuente": "archivo"}, "MAI.ROS/DIC26 184 P": {"ajuste": 0.109593, "fuente": "archivo"}, "MAI.ROS/DIC26 188 P": {"ajuste": 0.25961, "fuente": "archivo"}, "MAI.ROS/DIC26 192 P": {"ajuste": 0.55374, "fuente": "archivo"}, "MAI.ROS/DIC26 196 P": {"ajuste": 1.073682, "fuente": "archivo"}, "MAI.ROS/DIC26 200 P": {"ajuste": 1.909957, "fuente": "archivo"}, "MAI.ROS/DIC26 204 P": {"ajuste": 3.144894, "fuente": "archivo"}, "MAI.ROS/ABR27 168 P": {"ajuste": 0.034489, "fuente": "archivo"}, "MAI.ROS/ABR27 176 P": {"ajuste": 0.161709, "fuente": "archivo"}, "MAI.ROS/ABR27 180 P": {"ajuste": 0.313681, "fuente": "archivo"}, "MAI.ROS/ABR27 184 P": {"ajuste": 0.569861, "fuente": "archivo"}, "MAI.ROS/ABR27 188 P": {"ajuste": 0.974805, "fuente": "archivo"}, "MAI.ROS/ABR27 192 P": {"ajuste": 1.578125, "fuente": "archivo"}, "MAI.ROS/ABR27 196 P": {"ajuste": 2.429535, "fuente": "archivo"}, "MAI.ROS/ABR27 200 P": {"ajuste": 3.573006, "fuente": "archivo"}, "MAI.ROS/ABR27 204 P": {"ajuste": 5.041267, "fuente": "archivo"}, "MAI.ROS/JUL27 164 P": {"ajuste": 0.089718, "fuente": "archivo"}, "MAI.ROS/JUL27 168 P": {"ajuste": 0.174438, "fuente": "archivo"}, "MAI.ROS/JUL27 180 P": {"ajuste": 0.909308, "fuente": "archivo"}, "MAI.ROS/JUL27 184 P": {"ajuste": 1.427285, "fuente": "archivo"}, "MAI.ROS/JUL27 188 P": {"ajuste": 2.146046, "fuente": "archivo"}, "MAI.ROS/JUL27 192 P": {"ajuste": 3.102366, "fuente": "archivo"}, "MAI.ROS/JUL27 196 P": {"ajuste": 4.326849, "fuente": "archivo"}, "MAI.ROS/JUL27 200 P": {"ajuste": 5.840966, "fuente": "archivo"}, "SOJ.ROS/NOV26 312 P": {"ajuste": 0.000941, "fuente": "archivo"}, "SOJ.ROS/NOV26 316 P": {"ajuste": 0.00259, "fuente": "archivo"}, "SOJ.ROS/NOV26 320 P": {"ajuste": 0.006631, "fuente": "archivo"}, "SOJ.ROS/NOV26 324 P": {"ajuste": 0.015854, "fuente": "archivo"}, "SOJ.ROS/NOV26 328 P": {"ajuste": 0.035498, "fuente": "archivo"}, "SOJ.ROS/NOV26 332 P": {"ajuste": 0.074679, "fuente": "archivo"}, "SOJ.ROS/NOV26 336 P": {"ajuste": 0.148062, "fuente": "archivo"}, "SOJ.ROS/NOV26 340 P": {"ajuste": 0.277504, "fuente": "archivo"}, "SOJ.ROS/NOV26 344 P": {"ajuste": 0.493152, "fuente": "archivo"}, "SOJ.ROS/NOV26 348 P": {"ajuste": 0.833454, "fuente": "archivo"}, "SOJ.ROS/NOV26 352 P": {"ajuste": 1.343584, "fuente": "archivo"}, "SOJ.ROS/NOV26 356 P": {"ajuste": 2.072131, "fuente": "archivo"}, "SOJ.ROS/MAY27 276 P": {"ajuste": 0.004017, "fuente": "archivo"}, "SOJ.ROS/MAY27 300 P": {"ajuste": 0.133448, "fuente": "archivo"}, "SOJ.ROS/MAY27 304 P": {"ajuste": 0.213249, "fuente": "archivo"}, "SOJ.ROS/MAY27 308 P": {"ajuste": 0.331081, "fuente": "archivo"}, "SOJ.ROS/MAY27 312 P": {"ajuste": 0.500106, "fuente": "archivo"}, "SOJ.ROS/MAY27 316 P": {"ajuste": 0.73596, "fuente": "archivo"}, "SOJ.ROS/MAY27 320 P": {"ajuste": 1.056528, "fuente": "archivo"}, "SOJ.ROS/MAY27 324 P": {"ajuste": 1.481468, "fuente": "archivo"}, "SOJ.ROS/MAY27 328 P": {"ajuste": 2.031521, "fuente": "archivo"}, "SOJ.ROS/MAY27 332 P": {"ajuste": 2.727636, "fuente": "archivo"}, "SOJ.ROS/MAY27 336 P": {"ajuste": 3.589964, "fuente": "archivo"}, "SOJ.ROS/MAY27 340 P": {"ajuste": 4.636827, "fuente": "archivo"}, "SOJ.ROS/MAY27 348 P": {"ajuste": 10.061672, "fuente": "archivo"}, "SOJ.ROS/JUL27 312 P": {"ajuste": 0.691795, "fuente": "archivo"}, "SOJ.ROS/JUL27 328 P": {"ajuste": 2.26531, "fuente": "archivo"}, "SOJ.ROS/JUL27 332 P": {"ajuste": 2.923162, "fuente": "archivo"}, "SOJ.ROS/JUL27 336 P": {"ajuste": 3.715894, "fuente": "archivo"}, "SOJ.ROS/JUL27 340 P": {"ajuste": 4.656858, "fuente": "archivo"}, "SOY.CME/OCT26 390 P": {"ajuste": 0.013304, "fuente": "archivo"}, "SOY.CME/OCT26 397 P": {"ajuste": 0.033331, "fuente": "archivo"}, "SOY.CME/OCT26 400 P": {"ajuste": 0.048231, "fuente": "archivo"}, "SOY.CME/OCT26 408 P": {"ajuste": 0.120844, "fuente": "archivo"}, "SOY.CME/OCT26 412 P": {"ajuste": 0.184731, "fuente": "archivo"}, "SOY.CME/OCT26 423 P": {"ajuste": 0.530908, "fuente": "archivo"}, "TRI.ROS/DIC26 192 P": {"ajuste": 0.006041, "fuente": "archivo"}, "TRI.ROS/DIC26 196 P": {"ajuste": 0.0155, "fuente": "archivo"}, "TRI.ROS/DIC26 200 P": {"ajuste": 0.036655, "fuente": "archivo"}, "TRI.ROS/DIC26 204 P": {"ajuste": 0.080326, "fuente": "archivo"}, "TRI.ROS/DIC26 208 P": {"ajuste": 0.163984, "fuente": "archivo"}, "TRI.ROS/DIC26 212 P": {"ajuste": 0.31342, "fuente": "archivo"}, "TRI.ROS/DIC26 216 P": {"ajuste": 0.563499, "fuente": "archivo"}, "TRI.ROS/DIC26 220 P": {"ajuste": 0.957352, "fuente": "archivo"}, "TRI.ROS/DIC26 224 P": {"ajuste": 1.543648, "fuente": "archivo"}, "TRI.ROS/DIC26 228 P": {"ajuste": 2.372089, "fuente": "archivo"}, "TRI.ROS/DIC26 232 P": {"ajuste": 2.932348, "fuente": "archivo"}, "TRI.ROS/DIC26 244 P": {"ajuste": 8.835435, "fuente": "archivo"}, "TRI.ROS/ENE27 192 P": {"ajuste": 0.019966, "fuente": "archivo"}, "TRI.ROS/ENE27 196 P": {"ajuste": 0.041576, "fuente": "archivo"}, "TRI.ROS/ENE27 200 P": {"ajuste": 0.081727, "fuente": "archivo"}, "TRI.ROS/ENE27 204 P": {"ajuste": 0.152239, "fuente": "archivo"}, "TRI.ROS/ENE27 208 P": {"ajuste": 0.269698, "fuente": "archivo"}, "TRI.ROS/ENE27 212 P": {"ajuste": 0.455927, "fuente": "archivo"}, "TRI.ROS/ENE27 216 P": {"ajuste": 0.737865, "fuente": "archivo"}, "TRI.ROS/ENE27 220 P": {"ajuste": 1.146691, "fuente": "archivo"}, "TRI.ROS/ENE27 224 P": {"ajuste": 1.71617, "fuente": "archivo"}, "TRI.ROS/ENE27 228 P": {"ajuste": 2.480353, "fuente": "archivo"}, "TRI.ROS/ENE27 232 P": {"ajuste": 3.470907, "fuente": "archivo"}, "TRI.ROS/ENE27 236 P": {"ajuste": 4.71446, "fuente": "archivo"}, "TRI.ROS/ENE27 240 P": {"ajuste": 6.230377, "fuente": "archivo"}, "TRI.ROS/MAR27 220 P": {"ajuste": 1.528334, "fuente": "archivo"}};
+const SEED_META = {fecha:'2026-08-28', fuente:'MTR_Rofex_Posi.xlsx (carga inicial)'};
+const SEED_REFERENCIAS = {"Acopio": {"1)": "300 tnsVenta soja Nov - Calzada con compra de a Cliente 350u$ / 300 tnsVenta soja Nov - Calzada con compra de a Cliente 358u$", "2)": "Sintetico Futuro + Call Nov26", "3)": "Sintetico Futuro + Call May 27 - 1000tns", "4)": "Diferencia de posicion - Pase", "7)": "Se le vendio a COFCO 2000tns - Cto 1435 (Se fue desarmando) / Venta a COFCO 1500tns -  Cto 1468 u$342", "8)": "Compra  MAT 500tns - Arbitrado con Venta a Cofco - Maiz Abr"}, "Siembras": {"1)": "Condicional Vta Fwd Ene 235 - 1000tns", "2)": "Condicion Vta Fwd Mayo 350 - 1000tns"}};
+const SEED_VERSION = 'v20-sin-total-posiciones';
+const STORAGE_KEY_SEED_VERSION = 'mtr:seedVersion';
+
+/* =========================================================================
+   ESTADO
+========================================================================= */
+const STORAGE_KEY_POSITIONS = 'mtr:positions';
+const STORAGE_KEY_PRICES    = 'mtr:priceMap';
+const STORAGE_KEY_PRICEMETA = 'mtr:priceMeta';
+const STORAGE_KEY_SCENARIOS = 'mtr:scenarioPrices';
+const STORAGE_KEY_REFERENCIAS = 'mtr:referencias';
+
+let STATE = {
+  loaded:false,
+  positions: [],
+  priceMap: {},        // ticker -> {ajuste:number, fuente:string}
+  priceMeta: {fecha:null, fuente:null},
+  scenarioPrices: {},  // "GRANO|YYYY-MM" -> price
+  referencias: {},     // {Acopio:{'1)':'texto'...}, Siembras:{...}} — glosario de qué significa cada número
+  ui: {
+    tab:'dashboard',
+    filterCartera:'Todas',
+    filterGrano:'Todos',
+    filterEstado:'Abierta',
+    search:'',
+    editingPosition:null,   // objeto en edición o null
+    modalEstrategiaMode:false,
+    resumenFiltros: {cartera:'Todas', grano:'Todos', instrumento:'Todos', operacion:'Todas', mes:'Todos', anio:'Todos', precio:''},
+    escenarioFiltros: {cartera:'Todas', grano:'Todos', instrumento:'Todos', operacion:'Todas', mes:'Todos', anio:'Todos', precio:''},
+    diagnosticosAbiertos: new Set(),
+    showImport:false,
+    showAdd:false,
+  }
+};
+
+const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+const GRANOS_SUGERIDOS = ['Soja','Maiz','Trigo','Girasol','Cebada','Sorgo'];
+
+/* =========================================================================
+   STORAGE
+========================================================================= */
+async function loadState(){
+  let usedStoredPositions = false;
+  try{
+    const p = await storageAdapter.get(STORAGE_KEY_POSITIONS).catch(()=>null);
+    STATE.positions = p ? JSON.parse(p.value) : SEED_POSITIONS.slice();
+    usedStoredPositions = !!p;
+  }catch(e){ STATE.positions = SEED_POSITIONS.slice(); }
+  try{
+    const pm = await storageAdapter.get(STORAGE_KEY_PRICES).catch(()=>null);
+    STATE.priceMap = pm ? JSON.parse(pm.value) : {...SEED_PRICES};
+  }catch(e){ STATE.priceMap = {...SEED_PRICES}; }
+  try{
+    const pmeta = await storageAdapter.get(STORAGE_KEY_PRICEMETA).catch(()=>null);
+    STATE.priceMeta = pmeta ? JSON.parse(pmeta.value) : {...SEED_META};
+  }catch(e){ STATE.priceMeta = {...SEED_META}; }
+  try{
+    const sc = await storageAdapter.get(STORAGE_KEY_SCENARIOS).catch(()=>null);
+    STATE.scenarioPrices = sc ? JSON.parse(sc.value) : {};
+  }catch(e){ STATE.scenarioPrices = {}; }
+  try{
+    const rf = await storageAdapter.get(STORAGE_KEY_REFERENCIAS).catch(()=>null);
+    STATE.referencias = rf ? JSON.parse(rf.value) : {...SEED_REFERENCIAS};
+  }catch(e){ STATE.referencias = {...SEED_REFERENCIAS}; }
+
+  // ¿Los datos guardados en este navegador vienen de una versión anterior de la app?
+  let storedVersion = null;
+  try{ storedVersion = (await storageAdapter.get(STORAGE_KEY_SEED_VERSION).catch(()=>null))?.value || null; }catch(e){ storedVersion = null; }
+  if(!usedStoredPositions){
+    // Primera vez en este navegador: quedamos al día automáticamente.
+    try{ await storageAdapter.set(STORAGE_KEY_SEED_VERSION, SEED_VERSION); }catch(e){}
+    STATE.seedOutdated = false;
+  } else {
+    STATE.seedOutdated = storedVersion !== SEED_VERSION;
+  }
+
+  STATE.loaded = true;
+}
+async function savePositions(){
+  try{ await storageAdapter.set(STORAGE_KEY_POSITIONS, JSON.stringify(STATE.positions)); }
+  catch(e){ toast('No se pudo guardar (posiciones).','err'); }
+}
+async function savePrices(){
+  try{
+    await storageAdapter.set(STORAGE_KEY_PRICES, JSON.stringify(STATE.priceMap));
+    await storageAdapter.set(STORAGE_KEY_PRICEMETA, JSON.stringify(STATE.priceMeta));
+  }catch(e){ toast('No se pudo guardar (precios).','err'); }
+}
+async function saveScenarios(){
+  try{ await storageAdapter.set(STORAGE_KEY_SCENARIOS, JSON.stringify(STATE.scenarioPrices)); }
+  catch(e){ /* silencioso */ }
+}
+async function saveReferencias(){
+  try{ await storageAdapter.set(STORAGE_KEY_REFERENCIAS, JSON.stringify(STATE.referencias)); }
+  catch(e){ /* silencioso */ }
+}
+
+
+/* =========================================================================
+   UTILIDADES
+========================================================================= */
+function uid(){ return 'p_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8); }
+function fmtMoney(n, dec=2){
+  if(n===null||n===undefined||isNaN(n)) return '—';
+  return n.toLocaleString('es-AR',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+}
+function fmtTns(n){ return (n||0).toLocaleString('es-AR',{maximumFractionDigits:0}); }
+function fmtUSD(n, withSign=true){
+  if(n===null||n===undefined||isNaN(n)) return '<span class="val-na">s/d</span>';
+  const cls = n>0?'val-gain':(n<0?'val-loss':'');
+  const sign = withSign && n>0 ? '+' : '';
+  return `<span class="${cls}">${sign}${fmtMoney(n,0)}</span>`;
+}
+function granoCode(g){ return (g||'').trim().toUpperCase().slice(0,3); }
+function vtoToDate(v){
+  // v esperado "YYYY-MM"
+  if(!v) return null;
+  const [y,m] = v.split('-').map(Number);
+  return {y, m};
+}
+function mesAbbr(m){ return MESES[(m-1+12)%12]; }
+function buildFutTicker(grano, vto){
+  const d = vtoToDate(vto); if(!d) return null;
+  const yy = String(d.y).slice(-2);
+  return `${granoCode(grano)}.ROS/${mesAbbr(d.m)}${yy}`;
+}
+function buildOptTicker(grano, vto, strike, tipo){
+  const d = vtoToDate(vto); if(!d) return null;
+  const yy = String(d.y).slice(-2);
+  const letra = (tipo||'').trim().charAt(0).toUpperCase();
+  const strikeStr = (Number(strike)%1===0) ? String(Number(strike)) : String(strike);
+  return `${granoCode(grano)}.ROS/${mesAbbr(d.m)}${yy} ${strikeStr} ${letra}`;
+}
+function tickerFor(pos){
+  return pos.instrumento==='Futuro'
+    ? buildFutTicker(pos.grano, pos.vencimiento)
+    : buildOptTicker(pos.grano, pos.vencimiento, pos.strike, pos.tipoOpcion);
+}
+function marketPriceFor(pos){
+  const t = tickerFor(pos);
+  if(!t) return null;
+  const hit = STATE.priceMap[t.toUpperCase()];
+  return hit ? hit.ajuste : null;
+}
+function usedPriceFor(pos){
+  if(pos.estado==='Cerrada'){
+    return (pos.precioCierreOperacion!==null && pos.precioCierreOperacion!==undefined) ? pos.precioCierreOperacion : null;
+  }
+  if(pos.cierreManual!==null && pos.cierreManual!==undefined && pos.cierreManual!=='') return Number(pos.cierreManual);
+  return marketPriceFor(pos);
+}
+function diffUnitFor(pos, precio){
+  if(precio===null || precio===undefined || isNaN(precio)) return null;
+  const ap = Number(pos.apertura);
+  return pos.operacion==='Venta' ? (ap - precio) : (precio - ap);
+}
+function enrich(pos){
+  const precio = usedPriceFor(pos);
+  const diffU = diffUnitFor(pos, precio);
+  const total = diffU===null ? null : diffU*Number(pos.toneladas||0);
+  return {...pos, ticker:tickerFor(pos), precioUsado:precio, diffUnit:diffU, totalUSD:total,
+           precioEsManual: pos.estado!=='Cerrada' && pos.cierreManual!==null && pos.cierreManual!==undefined && pos.cierreManual!=='' };
+}
+function toast(msg, type=''){
+  const host = document.getElementById('toastHost');
+  const el = document.createElement('div');
+  el.className = 'toast'+(type==='err'?' err':'');
+  el.textContent = msg;
+  host.appendChild(el);
+  setTimeout(()=>{ el.style.transition='opacity .3s'; el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, 3200);
+}
+
+/* Confirmación propia dentro de la app (no depende de window.confirm(), que puede
+   quedar bloqueado según cómo se abra el archivo). */
+let pendingConfirmMessage = '';
+let pendingConfirmAction = null;
+function askConfirm(message, action){
+  pendingConfirmMessage = message;
+  pendingConfirmAction = action;
+  render();
+}
+function confirmModalHTML(){
+  return `
+  <div class="modal-backdrop" id="confirmBackdrop">
+    <div class="modal" style="max-width:420px;">
+      <h3>Confirmar</h3>
+      <p style="margin:10px 0 20px;font-size:13.5px;color:var(--ink);">${pendingConfirmMessage}</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnConfirmNo">Cancelar</button>
+        <button class="btn btn-danger" id="btnConfirmYes">Confirmar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* =========================================================================
+   IMPORTACION DE EXCEL / CSV
+========================================================================= */
+function gridFromSheet(ws){
+  return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+}
+function cellText(v){ return (typeof v==='string') ? v.trim() : v; }
+
+function findAnchors(grid){
+  // busca celdas 'Futuros'/'Opciones'/'Estrategias' con vecino izquierdo 'Acopio'/'Siembras'
+  const anchors = [];
+  for(let r=0;r<grid.length;r++){
+    const row = grid[r]||[];
+    for(let c=1;c<row.length;c++){
+      const v = cellText(row[c]);
+      if(typeof v==='string' && ['Futuros','Opciones','Estrategias'].includes(v)){
+        const left = cellText(row[c-1]);
+        if(left==='Acopio' || left==='Siembras'){
+          anchors.push({row:r, col:c, cartera:left, tipoTabla:v});
+        }
+      }
+    }
+  }
+  anchors.sort((a,b)=>a.row-b.row);
+  return anchors;
+}
+
+function excelDateToVto(v){
+  if(v && typeof v==='object' && typeof v.getFullYear==='function'){
+    return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}`;
+  }
+  if(typeof v==='number'){ // fecha serial excel
+    const d = XLSX.SSF.parse_date_code(v);
+    if(d) return `${d.y}-${String(d.m).padStart(2,'0')}`;
+  }
+  return null;
+}
+
+function parseLegBlock(grid, anchor, nextAnchorRow, cartera){
+  const headerRow = grid[anchor.row+1] || [];
+  // localizar columnas por texto de encabezado, buscando desde anchor.col-1 hasta +9
+  const colMap = {};
+  for(let c=Math.max(0,anchor.col-1); c<anchor.col+10; c++){
+    const h = cellText(headerRow[c]);
+    if(typeof h!=='string') continue;
+    const hl = h.toLowerCase();
+    if(hl==='grano') colMap.grano=c;
+    else if(hl==='op') colMap.op=c;
+    else if(hl==='tipo') colMap.tipo=c;
+    else if(hl.startsWith('posic')) colMap.vto=c;
+    else if(hl==='strike') colMap.strike=c;
+    else if(hl==='tns') colMap.tns=c;
+    else if(hl.startsWith('$ prom apert') || hl.startsWith('$ apert')) colMap.apertura=c;
+  }
+  if(colMap.grano===undefined || colMap.op===undefined) return {legs:[], legend:{}};
+  const labelCol = anchor.col-1;
+  const dataStart = anchor.row+2;
+  const hardLimit = nextAnchorRow!==null ? nextAnchorRow-1 : Math.min(grid.length, anchor.row+40);
+  const legs = [];
+  const legend = {}; // "2)" -> descripción tomada del pie de la hoja
+  let blankStreak = 0;
+  let currentGroupLabel = null;
+  let currentGroupId = null;
+  let groupCounter = 0;
+  let inGroup = false; // seguimos dentro del mismo grupo mientras no haya un corte en blanco
+  const isEstrategia = anchor.tipoTabla==='Estrategias';
+  for(let r=dataStart; r<=hardLimit && r<grid.length; r++){
+    const row = grid[r]||[];
+    const opVal = cellText(row[colMap.op]);
+    const granoVal = cellText(row[colMap.grano]);
+    const labelVal = cellText(row[labelCol]);
+    const validOp = (typeof opVal==='string') && ['compra','venta'].includes(opVal.trim().toLowerCase());
+    if(!validOp || !granoVal){
+      // ¿es una fila de referencia/leyenda al pie (número + texto descriptivo, sin operación)?
+      if(labelVal && typeof granoVal==='string' && granoVal.trim().length>8){
+        const key = labelVal.toString().trim();
+        legend[key] = legend[key] ? `${legend[key]} / ${granoVal.trim()}` : granoVal.trim();
+        blankStreak = 0;
+        continue;
+      }
+      inGroup = false;
+      blankStreak++;
+      if(blankStreak>=6) break;
+      continue;
+    }
+    blankStreak = 0;
+    if(labelVal){
+      currentGroupLabel = String(labelVal).trim();
+      groupCounter++;
+      currentGroupId = uid();
+      inGroup = true;
+    } else if(!inGroup){
+      currentGroupLabel = null;
+      groupCounter++;
+      currentGroupId = uid();
+      inGroup = true;
+    }
+    const tipoVal = colMap.tipo!==undefined ? cellText(row[colMap.tipo]) : null;
+    const isFut = !tipoVal || tipoVal.toString().toLowerCase().startsWith('fut');
+    const vtoRaw = row[colMap.vto];
+    const vto = excelDateToVto(vtoRaw);
+    const strike = colMap.strike!==undefined ? (Number(row[colMap.strike])||0) : 0;
+    const tns = Number(row[colMap.tns])||0;
+    const apertura = Number(row[colMap.apertura])||0;
+    if(!vto || !tns) continue;
+    legs.push({
+      id: uid(),
+      cartera: cartera,
+      instrumento: isFut ? 'Futuro' : 'Opcion',
+      grano: granoVal.toString().trim(),
+      operacion: opVal.trim().charAt(0).toUpperCase()+opVal.trim().slice(1).toLowerCase(),
+      vencimiento: vto,
+      tipoOpcion: isFut ? '' : (tipoVal||'').toString().trim(),
+      strike: isFut ? 0 : strike,
+      toneladas: tns,
+      apertura: apertura,
+      estrategia: isEstrategia ? (currentGroupLabel || `Estrategia ${groupCounter}`) : '',
+      estrategiaId: isEstrategia ? currentGroupId : null,
+      referencia: (labelVal!==null && labelVal!==undefined && labelVal!=='') ? String(labelVal).trim() : '',
+      notas:'',
+      estado:'Abierta',
+      origen:'importado',
+      fechaAlta: new Date().toISOString().slice(0,10),
+      cierreManual: null,
+      fechaCierre: null,
+      precioCierreOperacion: null,
+    });
+  }
+  return {legs, legend};
+}
+
+function parsePosiSeparada(ws){
+  const grid = gridFromSheet(ws);
+  const anchors = findAnchors(grid);
+  let legs = [];
+  const legendByCartera = {};
+  anchors.forEach((a)=>{
+    // Acopio y Siembras suelen correr en paralelo (columnas distintas) por el mismo rango de filas.
+    // Solo debe acotar el bloque otra ancla del MISMO lado (columna cercana), no la del lado opuesto.
+    const sameSide = x => (x.col<20) === (a.col<20);
+    const laterRows = anchors.filter(x=>x.row>a.row && sameSide(x)).map(x=>x.row);
+    const next = laterRows.length ? Math.min(...laterRows) : null;
+    const {legs:blockLegs, legend} = parseLegBlock(grid, a, next, a.cartera);
+    legendByCartera[a.cartera] = {...(legendByCartera[a.cartera]||{}), ...legend};
+    legs = legs.concat(blockLegs);
+  });
+  // Completar el nombre de la estrategia con la descripción del pie de hoja, cuando exista
+  legs = legs.map(l=>{
+    if(!l.estrategia) return l;
+    const leyenda = (legendByCartera[l.cartera]||{})[l.estrategia];
+    return leyenda ? {...l, estrategia: `${l.estrategia} ${leyenda}`} : l;
+  });
+  return {legs, legendByCartera};
+}
+
+function parseBaseSheetGeneric(ws){
+  const grid = gridFromSheet(ws);
+  if(!grid.length) return {};
+  const header = grid[0].map(h=> (typeof h==='string'? h.trim().toUpperCase() : h));
+  let colTicker = header.findIndex(h=> typeof h==='string' && (h.includes('TIPO CONTRATO') || h.includes('SIMBOLO') || h.includes('TICKER')));
+  let colAjuste = header.findIndex(h=> typeof h==='string' && h.includes('AJUSTE'));
+  if(colAjuste===-1) colAjuste = header.findIndex(h=> typeof h==='string' && (h.includes('CIERRE') || h==='ULTIMO'));
+  if(colTicker===-1 || colAjuste===-1) return {};
+  const map = {};
+  for(let r=1;r<grid.length;r++){
+    const row = grid[r]||[];
+    const t = cellText(row[colTicker]);
+    const a = row[colAjuste];
+    if(typeof t==='string' && t.trim() && typeof a==='number'){
+      map[t.trim().toUpperCase()] = {ajuste:a, fuente:'archivo'};
+    }
+  }
+  return map;
+}
+
+function handleWorkbook(wb, fileName){
+  let importedLegs = [];
+  let importedPrices = {};
+  let importedReferencias = null;
+  let foundPosiciones = false, foundPrecios = false;
+
+  const posiSheetName = wb.SheetNames.find(n=> n.toLowerCase().includes('posi'));
+  if(posiSheetName){
+    const resultado = parsePosiSeparada(wb.Sheets[posiSheetName]);
+    importedLegs = resultado.legs;
+    importedReferencias = resultado.legendByCartera;
+    foundPosiciones = importedLegs.length>0;
+  }
+  wb.SheetNames.forEach(name=>{
+    const nl = name.toLowerCase();
+    if(nl.includes('base futuro') || nl.includes('base opcion') || nl.includes('futuros') || nl.includes('opciones')){
+      const m = parseBaseSheetGeneric(wb.Sheets[name]);
+      if(Object.keys(m).length){ importedPrices = {...importedPrices, ...m}; foundPrecios = true; }
+    }
+  });
+
+  if(foundPrecios){
+    STATE.priceMap = {...STATE.priceMap, ...importedPrices};
+    STATE.priceMeta = {fecha: new Date().toISOString().slice(0,10), fuente: fileName};
+    savePrices();
+  }
+  if(foundPosiciones){
+    // Evita duplicados: una nueva importación reemplaza las posiciones abiertas
+    // que vinieron de una importación anterior. No toca las cargadas a mano
+    // ni las que ya se marcaron como cerradas (quedan como historial).
+    const conservar = STATE.positions.filter(p => p.origen==='manual' || p.estado==='Cerrada');
+    STATE.positions = conservar.concat(importedLegs.map(l=>({...l, origen:'importado'})));
+    savePositions();
+    if(importedReferencias){
+      STATE.referencias = importedReferencias;
+      saveReferencias();
+    }
+  }
+  return {legs: importedLegs.length, prices: Object.keys(importedPrices).length, foundPosiciones, foundPrecios};
+}
+
+function parseNumEs(str){
+  // Los exports de Rofex/MATba usan coma como separador decimal (ej: "215,700000").
+  // parseFloat нативо corta en la coma y trunca el número — por eso lo convertimos primero.
+  if(typeof str==='number') return str;
+  if(typeof str!=='string') return NaN;
+  const limpio = str.trim().replace(/\./g,'').replace(',', '.');
+  return parseFloat(limpio);
+}
+function handleCsvPrices(parsedRows, fileName){
+  if(!parsedRows.length) return {prices:0};
+  const original = Object.keys(parsedRows[0]);
+  let tickerKey = original.find(k=> k.trim().toUpperCase().includes('TIPO CONTRATO') || k.trim().toUpperCase().includes('SIMBOLO') || k.trim().toUpperCase().includes('TICKER'));
+  let ajusteKey = original.find(k=> k.trim().toUpperCase().includes('AJUSTE'));
+  if(!ajusteKey) ajusteKey = original.find(k=> k.trim().toUpperCase().includes('CIERRE') || k.trim().toUpperCase()==='ULTIMO');
+  if(!tickerKey || !ajusteKey) return {prices:0, error:true};
+  const map = {};
+  parsedRows.forEach(row=>{
+    const t = row[tickerKey];
+    const a = parseNumEs(row[ajusteKey]);
+    if(t && !isNaN(a)) map[String(t).trim().toUpperCase()] = {ajuste:a, fuente:'csv'};
+  });
+  STATE.priceMap = {...STATE.priceMap, ...map};
+  STATE.priceMeta = {fecha:new Date().toISOString().slice(0,10), fuente:fileName};
+  savePrices();
+  return {prices:Object.keys(map).length};
+}
+
+function processFile(file){
+  return new Promise((resolve)=>{
+    const name = file.name.toLowerCase();
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try{
+        if(name.endsWith('.csv')){
+          Papa.parse(new TextDecoder('utf-8').decode(e.target.result), {
+            header:true, skipEmptyLines:true,
+            complete: (res)=>{
+              const r = handleCsvPrices(res.data, file.name);
+              resolve({file:file.name, ...r});
+            }
+          });
+        } else {
+          const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+          const r = handleWorkbook(wb, file.name);
+          resolve({file:file.name, ...r});
+        }
+      }catch(err){
+        console.error(err);
+        resolve({file:file.name, error:true, mensaje:err.message});
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function processFiles(fileList){
+  const files = Array.from(fileList);
+  if(!files.length) return;
+  const resultados = [];
+  for(const file of files){
+    resultados.push(await processFile(file));
+  }
+  let totalPosiciones = 0, totalPrecios = 0;
+  const errores = [];
+  resultados.forEach(r=>{
+    if(r.error){ errores.push(`${r.file}: ${r.mensaje || 'no se reconoció la estructura'}`); return; }
+    const esCsv = r.file.toLowerCase().endsWith('.csv');
+    if(esCsv){
+      if(r.prices) totalPrecios += r.prices;
+      else errores.push(`${r.file}: no se encontraron columnas de precio/ticker reconocibles.`);
+    } else {
+      if(r.foundPosiciones) totalPosiciones += r.legs;
+      if(r.foundPrecios) totalPrecios += r.prices;
+      if(!r.foundPosiciones && !r.foundPrecios) errores.push(`${r.file}: no se reconoció la estructura (¿es el MTR original?).`);
+    }
+  });
+  const msgs = [];
+  if(totalPosiciones) msgs.push(`${totalPosiciones} posiciones importadas`);
+  if(totalPrecios) msgs.push(`${totalPrecios} contratos de precio actualizados (${files.length} archivo${files.length>1?'s':''})`);
+  if(msgs.length) toast(msgs.join(' · ')+'.');
+  if(errores.length) toast(errores.join(' | '),'err');
+  render();
+}
+
+/* =========================================================================
+   RENDER: helpers de UI
+========================================================================= */
+function el(html){
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+function setTab(tab){ STATE.ui.tab = tab; render(); }
+
+function carterasPresentes(){
+  const s = new Set(STATE.positions.map(p=>p.cartera));
+  return ['Todas', ...Array.from(s)];
+}
+function granosPresentes(){
+  const s = new Set(STATE.positions.map(p=>p.grano));
+  return ['Todos', ...Array.from(s).sort()];
+}
+
+function filteredPositions(){
+  return STATE.positions.filter(p=>{
+    if(p.estado!=='Abierta') return false;
+    if(STATE.ui.filterCartera!=='Todas' && p.cartera!==STATE.ui.filterCartera) return false;
+    if(STATE.ui.filterGrano!=='Todos' && p.grano!==STATE.ui.filterGrano) return false;
+    if(STATE.ui.search){
+      const s = STATE.ui.search.toLowerCase();
+      const hay = `${p.grano} ${p.estrategia} ${p.notas} ${p.vencimiento}`.toLowerCase();
+      if(!hay.includes(s)) return false;
+    }
+    return true;
+  });
+}
+
+/* =========================================================================
+   RENDER: Sidebar
+========================================================================= */
+function renderSidebar(){
+  const tabs = [
+    {id:'dashboard', label:'Resumen', icon:'M4 13h4v7H4zM10 9h4v11h-4zM16 4h4v16h-4z'},
+    {id:'posiciones', label:'Posiciones', icon:'M4 5h16M4 12h16M4 19h9'},
+    {id:'escenarios', label:'Escenarios', icon:'M4 20V10M10 20V4M16 20v-7M4 20h16'},
+    {id:'datos', label:'Cargar datos', icon:'M12 4v12m0 0l-4-4m4 4l4-4M4 20h16'},
+    {id:'historial', label:'Historial', icon:'M12 8v4l3 3M21 12a9 9 0 11-9-9 9 9 0 019 9z'},
+  ];
+  return `
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <div>
+        <div class="brand-name">La Bragadense</div>
+        <div class="brand-sub">MTR · Posición abierta</div>
+      </div>
+    </div>
+    ${tabs.map(t=>`
+      <button class="navbtn ${STATE.ui.tab===t.id?'active':''}" data-tab="${t.id}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${t.icon}"/></svg>
+        <span>${t.label}</span>
+      </button>
+    `).join('')}
+    <div class="sidebar-foot">Datos guardados en este navegador.<br>Última carga de precios:<br><strong style="color:#fff">${STATE.priceMeta.fecha || 'sin datos'}</strong></div>
+  </div>`;
+}
+
+/* =========================================================================
+   RENDER: Topbar
+========================================================================= */
+function renderTopbar(){
+  const titles = {
+    dashboard:['Resumen de posición','Acopio y Siembras — resultado contra el último cierre'],
+    posiciones:['Posiciones abiertas','Todas las posiciones abiertas, de Acopio y Siembras, juntas'],
+    escenarios:['Simulador de escenarios','Definí precios futuros hipotéticos y mirá el impacto'],
+    datos:['Cargar datos','Subí el archivo de Rofex/MATba o el Excel del MTR completo'],
+    historial:['Historial','Posiciones y estrategias ya cerradas'],
+  };
+  const [h,s] = titles[STATE.ui.tab];
+  return `
+  <div class="topbar">
+    <div>
+      <h1>${h}</h1>
+      <div class="sub">${s}</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="btn btn-accent" id="btnAddPos">+ Nueva posición</button>
+    </div>
+  </div>`;
+}
+
+/* =========================================================================
+   RENDER: Dashboard
+========================================================================= */
+function miniTable(legs){
+  if(!legs.length) return `<div class="small-muted" style="padding:10px 2px;">Sin posiciones.</div>`;
+  const total = legs.reduce((a,p)=>a+(p.totalUSD||0),0);
+  return `
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Ref.</th><th>Instr.</th><th>Grano</th><th>Op</th><th>Vto</th><th class="num">Strike</th><th class="num">Tns</th><th class="num">$ Apert.</th><th class="num">$ Cierre</th><th class="num">Result.</th></tr></thead>
+      <tbody>
+        ${legs.map(p=>`<tr>
+          <td class="small-muted">${p.referencia||'—'}</td>
+          <td><span class="tag ${p.instrumento==='Futuro'?'tag-fut':'tag-op'}">${p.instrumento==='Futuro'?'Futuro':p.tipoOpcion}</span></td>
+          <td>${p.grano}</td>
+          <td class="${p.operacion==='Compra'?'pill-compra':'pill-venta'}">${p.operacion}</td>
+          <td>${p.vencimiento}</td>
+          <td class="num">${p.strike?fmtMoney(p.strike,1):'—'}</td>
+          <td class="num">${fmtTns(p.toneladas)}</td>
+          <td class="num">${fmtMoney(p.apertura,2)}</td>
+          <td class="num">${p.precioUsado!==null?fmtMoney(p.precioUsado,1):'<span class="val-na">s/d</span>'}</td>
+          <td class="num">${fmtUSD(p.totalUSD)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+  <div style="text-align:right;font-weight:700;padding:8px 4px 2px;border-top:1px solid var(--border);margin-top:6px;">Subtotal: ${fmtUSD(total)}</div>`;
+}
+
+function estrategiaMiniGroups(legs){
+  const byName = {};
+  legs.forEach(p=>{ const k = p.estrategia||'(sin nombre)'; (byName[k]=byName[k]||[]).push(p); });
+  return Object.entries(byName).sort((a,b)=>a[0].localeCompare(b[0])).map(([name,ls])=>{
+    const t = ls.reduce((a,p)=>a+(p.totalUSD||0),0);
+    return `<div style="margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="font-weight:700;color:var(--teal-ink);">${name}</span>
+        <span style="font-weight:700;">${fmtUSD(t)}</span>
+      </div>
+      ${miniTable(ls)}
+    </div>`;
+  }).join('');
+}
+
+/* ---- Tablas propias de la planilla Resumen (sin subtotal, columnas Ref/Grano/Instrumento) ---- */
+function resumenTable(legs){
+  if(!legs.length) return `<div class="small-muted" style="padding:10px 2px;">Sin posiciones.</div>`;
+  return `
+  <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th>Ref.</th><th>Grano</th><th>Instr.</th><th>Op</th><th>Vto</th>
+        <th class="num">Strike</th><th class="num">Tns</th><th class="num">$ Apert.</th><th class="num">$ Cierre</th><th class="num">Result.</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${legs.map(p=>`<tr>
+          <td class="small-muted">${p.referencia||'—'}</td>
+          <td>${p.grano}</td>
+          <td><span class="tag ${p.instrumento==='Futuro'?'tag-fut':'tag-op'}">${p.instrumento==='Futuro'?'Futuro':p.tipoOpcion}</span></td>
+          <td class="${p.operacion==='Compra'?'pill-compra':'pill-venta'}">${p.operacion}</td>
+          <td>${p.vencimiento}</td>
+          <td class="num">${p.strike?fmtMoney(Math.round(p.strike),0):'—'}</td>
+          <td class="num">${fmtTns(p.toneladas)}</td>
+          <td class="num">${fmtMoney(p.apertura,2)}</td>
+          <td class="num">${p.precioUsado!==null?fmtMoney(p.precioUsado,1):'<span class="val-na">s/d</span>'}</td>
+          <td class="num">${fmtUSD(p.totalUSD)}</td>
+          <td style="white-space:nowrap;">
+            <button class="icon-btn" title="Editar" onclick="openEdit('${p.id}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+            </button>
+            <button class="icon-btn" title="Eliminar" onclick="deletePosition('${p.id}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-1 0v14a1 1 0 01-1 1H9a1 1 0 01-1-1V6"/></svg>
+            </button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+function resumenEstrategiaGroups(legs){
+  const byId = {};
+  legs.forEach(p=>{ const k = p.estrategiaId || p.id; (byId[k]=byId[k]||[]).push(p); });
+  // Ordenar los grupos por el nombre visible de cada uno, para que la lista sea estable
+  const grupos = Object.entries(byId).sort((a,b)=> (a[1][0].estrategia||'').localeCompare(b[1][0].estrategia||''));
+  return grupos.map(([estrategiaId,ls])=>{
+    const name = ls[0].estrategia || '(sin nombre)';
+    const diag = diagnosticarEstrategia(ls, p=>p, false); // ls ya viene enriquecido con precios reales de cierre
+    return `
+    <div style="margin-bottom:22px;padding:14px 16px;border:1px solid var(--border);border-radius:8px;background:#FBFCFA;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+        <span style="font-weight:700;color:var(--teal-ink);">${name}</span>
+        <button class="icon-btn" title="Editar estrategia (nombre y posiciones)" onclick="openEditStrategy('${estrategiaId}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+        </button>
+        <button class="icon-btn" title="Eliminar toda la estrategia" onclick="deleteStrategyGroup('${estrategiaId}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-1 0v14a1 1 0 01-1 1H9a1 1 0 01-1-1V6"/></svg>
+        </button>
+      </div>
+      ${diagnosticoPanelHTML(diag, 'res_'+estrategiaId)}
+      ${resumenTable(ls)}
+    </div>`;
+  }).join('');
+}
+
+const MESES_FILTRO = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+const MESES_FILTRO_LABEL = {'01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun','07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic'};
+
+function aniosPresentes(){
+  const s = new Set(STATE.positions.filter(p=>p.vencimiento).map(p=>p.vencimiento.split('-')[0]));
+  return Array.from(s).sort();
+}
+function mesesPresentes(){
+  const s = new Set(STATE.positions.filter(p=>p.vencimiento).map(p=>p.vencimiento.split('-')[1]));
+  return MESES_FILTRO.filter(m=>s.has(m));
+}
+function granosPresentesResumen(){
+  const base = ['Soja','Maiz','Trigo'];
+  const extra = Array.from(new Set(STATE.positions.map(p=>p.grano))).filter(g=>!base.includes(g));
+  return [...base, ...extra.sort()];
+}
+function coincideInstrumento(p, valor){
+  if(valor==='Todos') return true;
+  if(valor==='Futuro') return p.instrumento==='Futuro';
+  if(valor==='Call') return p.instrumento==='Opcion' && p.tipoOpcion==='Call';
+  if(valor==='Put') return p.instrumento==='Opcion' && p.tipoOpcion==='Put';
+  return true;
+}
+function pasaFiltrosResumen(p){
+  const f = STATE.ui.resumenFiltros;
+  if(f.cartera!=='Todas' && p.cartera!==f.cartera) return false;
+  if(f.grano!=='Todos' && p.grano!==f.grano) return false;
+  if(!coincideInstrumento(p, f.instrumento)) return false;
+  if(f.operacion!=='Todas' && p.operacion!==f.operacion) return false;
+  if(f.mes!=='Todos' && (p.vencimiento||'').split('-')[1]!==f.mes) return false;
+  if(f.anio!=='Todos' && (p.vencimiento||'').split('-')[0]!==f.anio) return false;
+  if(f.precio){
+    const buscado = f.precio.trim();
+    const strikeStr = p.strike ? String(p.strike) : '';
+    const aperturaStr = String(p.apertura);
+    if(!strikeStr.includes(buscado) && !aperturaStr.includes(buscado)) return false;
+  }
+  return true;
+}
+function resumenFiltrosBarHTML(){
+  const f = STATE.ui.resumenFiltros;
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-body">
+      <div class="filters">
+        <label class="field">Cartera
+          <select id="rfCartera">${['Todas','Acopio','Siembras'].map(o=>`<option ${f.cartera===o?'selected':''}>${o}</option>`).join('')}</select>
+        </label>
+        <label class="field">Grano
+          <select id="rfGrano">${['Todos',...granosPresentesResumen()].map(o=>`<option ${f.grano===o?'selected':''}>${o}</option>`).join('')}</select>
+        </label>
+        <label class="field">Instrumento
+          <select id="rfInstrumento">${['Todos','Futuro','Call','Put'].map(o=>`<option value="${o}" ${f.instrumento===o?'selected':''}>${o==='Futuro'?'Futuros':(o==='Todos'?'Todos':'Opciones · '+o)}</option>`).join('')}</select>
+        </label>
+        <label class="field">Operación
+          <select id="rfOperacion">${['Todas','Compra','Venta'].map(o=>`<option ${f.operacion===o?'selected':''}>${o}</option>`).join('')}</select>
+        </label>
+        <label class="field">Mes
+          <select id="rfMes"><option value="Todos" ${f.mes==='Todos'?'selected':''}>Todos</option>${mesesPresentes().map(m=>`<option value="${m}" ${f.mes===m?'selected':''}>${MESES_FILTRO_LABEL[m]}</option>`).join('')}</select>
+        </label>
+        <label class="field">Año
+          <select id="rfAnio"><option value="Todos" ${f.anio==='Todos'?'selected':''}>Todos</option>${aniosPresentes().map(a=>`<option ${f.anio===a?'selected':''}>${a}</option>`).join('')}</select>
+        </label>
+        <label class="field">$ (precio/strike)
+          <input type="text" id="rfPrecio" value="${f.precio}" placeholder="ej: 360">
+        </label>
+        <button class="btn btn-ghost btn-sm" id="btnResetFiltrosResumen" style="align-self:flex-end;">Quitar filtros</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function posicionNetaBadgesHTML(positions){
+  const granosBase = ['Soja','Maiz','Trigo'];
+  const extra = Array.from(new Set(positions.map(p=>p.grano))).filter(g=>g && !granosBase.includes(g)).sort();
+  const granos = [...granosBase, ...extra];
+  const nets = {};
+  positions.forEach(p=>{
+    const signo = p.operacion==='Compra' ? 1 : -1;
+    nets[p.grano] = (nets[p.grano]||0) + signo*Number(p.toneladas||0);
+  });
+  return `
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+    ${granos.map(g=>{
+      const val = nets[g]||0;
+      const comprado = val>0, vendido = val<0;
+      const bg = comprado?'var(--gain-bg)':(vendido?'var(--loss-bg)':'#EEF1EE');
+      const color = comprado?'var(--gain)':(vendido?'var(--loss)':'var(--muted)');
+      const etiqueta = comprado?'Comprado':(vendido?'Vendido':'Neutro');
+      return `<div style="background:${bg};border-radius:8px;padding:10px 16px;min-width:150px;flex:1;max-width:220px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.3px;">${g.toUpperCase()}</div>
+        <div style="font-size:16px;font-weight:800;color:${color};margin-top:2px;">${etiqueta}${val!==0?` · ${fmtTns(Math.abs(val))} tn`:''}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderDashboard(){
+  const enriched = STATE.positions.filter(p=>p.estado==='Abierta').map(enrich);
+
+  if(!STATE.positions.length){
+    return `
+    <div class="empty card">
+      <h3>Todavía no cargaste posiciones</h3>
+      <p>Importá tu Excel del MTR (pestaña "Posi Separada" + bases de precios) o cargá una posición manualmente.</p>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:14px;">
+        <button class="btn btn-primary" onclick="setTab('datos')">Importar Excel</button>
+        <button class="btn btn-ghost" id="btnAddPosEmpty">Cargar manualmente</button>
+      </div>
+    </div>`;
+  }
+
+  const filtradas = enriched.filter(pasaFiltrosResumen);
+  const f = STATE.ui.resumenFiltros;
+  const mostrarAcopio = f.cartera!=='Siembras';
+  const mostrarSiembras = f.cartera!=='Acopio';
+
+  const acopioSueltas = filtradas.filter(p=>p.cartera==='Acopio' && !p.estrategiaId);
+  const acopioEstrategias = filtradas.filter(p=>p.cartera==='Acopio' && p.estrategiaId);
+  const siembrasSueltas = filtradas.filter(p=>p.cartera==='Siembras' && !p.estrategiaId);
+  const siembrasEstrategias = filtradas.filter(p=>p.cartera==='Siembras' && p.estrategiaId);
+
+  const acopioCard = `
+    <div class="card">
+      <div class="card-head"><h2>Acopio</h2></div>
+      <div class="card-body">
+        <h3 style="font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:700;">Posiciones sueltas</h3>
+        ${resumenTable(acopioSueltas)}
+        <h3 style="font-size:13px;color:var(--muted);margin:20px 0 8px;font-weight:700;">Estrategias armadas</h3>
+        ${acopioEstrategias.length? resumenEstrategiaGroups(acopioEstrategias) : '<div class="small-muted">Sin estrategias armadas.</div>'}
+      </div>
+    </div>`;
+  const siembrasCard = `
+    <div class="card">
+      <div class="card-head"><h2>Siembras</h2></div>
+      <div class="card-body">
+        <h3 style="font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:700;">Posiciones sueltas</h3>
+        ${resumenTable(siembrasSueltas)}
+        <h3 style="font-size:13px;color:var(--muted);margin:20px 0 8px;font-weight:700;">Estrategias armadas</h3>
+        ${siembrasEstrategias.length? resumenEstrategiaGroups(siembrasEstrategias) : '<div class="small-muted">Sin estrategias armadas.</div>'}
+      </div>
+    </div>`;
+
+  return `
+  ${posicionNetaBadgesHTML(filtradas)}
+  ${resumenFiltrosBarHTML()}
+  <div class="grid-2" style="${(!mostrarAcopio || !mostrarSiembras)?'grid-template-columns:1fr;':''}">
+    ${mostrarAcopio? acopioCard : ''}
+    ${mostrarSiembras? siembrasCard : ''}
+  </div>
+  ${referenciasGlosarioHTML()}`;
+}
+function referenciasGlosarioHTML(){
+  const ref = STATE.referencias || {};
+  const filas = [];
+  ['Acopio','Siembras'].forEach(cartera=>{
+    Object.entries(ref[cartera]||{}).forEach(([numero,texto])=>{
+      filas.push({cartera, numero, texto});
+    });
+  });
+  if(!filas.length) return '';
+  filas.sort((a,b)=> a.cartera.localeCompare(b.cartera) || a.numero.localeCompare(b.numero, undefined, {numeric:true}));
+  const abierto = STATE.ui.diagnosticosAbiertos.has('__glosario__');
+  return `
+  <div class="card" style="margin-top:16px;">
+    <div class="card-body">
+      <button onclick="toggleDiagnostico('__glosario__')" style="background:none;border:none;cursor:pointer;padding:2px 0;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--teal-ink);">
+        <span style="display:inline-block;transition:transform .15s;transform:rotate(${abierto?'90deg':'0deg'});">▸</span>
+        ${abierto?'Ocultar':'Ver'} qué significa cada referencia (${filas.length})
+      </button>
+      ${abierto? `
+      <div class="table-scroll" style="margin-top:10px;">
+        <table>
+          <thead><tr><th>Cartera</th><th>Ref.</th><th>Qué es</th></tr></thead>
+          <tbody>
+            ${filas.map(f=>`<tr>
+              <td><span class="tag ${f.cartera==='Acopio'?'tag-acopio':'tag-siembras'}">${f.cartera}</span></td>
+              <td class="small-muted">${f.numero}</td>
+              <td>${f.texto}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
+/* =========================================================================
+   RENDER: Posiciones (tabla + filtros + alta/edición)
+========================================================================= */
+function positionRow(p){
+  const e = enrich(p);
+  const cls = p.estado==='Cerrada' ? 'row-closed' : '';
+  return `
+  <tr class="${cls}" data-id="${p.id}">
+    <td class="small-muted">${p.referencia||'—'}</td>
+    <td><span class="tag ${p.cartera==='Acopio'?'tag-acopio':'tag-siembras'}">${p.cartera}</span></td>
+    <td><span class="tag ${p.instrumento==='Futuro'?'tag-fut':'tag-op'}">${p.instrumento==='Futuro'?'Futuro':p.tipoOpcion}</span></td>
+    <td>${p.grano}</td>
+    <td class="${p.operacion==='Compra'?'pill-compra':'pill-venta'}">${p.operacion}</td>
+    <td>${p.vencimiento}</td>
+    <td class="num">${p.strike? fmtMoney(p.strike,1):'—'}</td>
+    <td class="num">${fmtTns(p.toneladas)}</td>
+    <td class="num">${fmtMoney(p.apertura,2)}</td>
+    <td class="num">${e.precioUsado!==null? fmtMoney(e.precioUsado,1)+(e.precioEsManual?' *':'') : '<span class="val-na">s/d</span>'}</td>
+    <td class="num">${fmtUSD(e.totalUSD)}</td>
+    <td>${p.estrategia?`<span class="small-muted">${p.estrategia}</span>`:''}</td>
+    <td>
+      <button class="icon-btn" title="Editar" onclick="openEdit('${p.id}')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+      </button>
+      ${p.estado==='Abierta' ? `
+      <button class="icon-btn" title="Cerrar posición" onclick="openClose('${p.id}')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>` : ''}
+      <button class="icon-btn" title="Eliminar" onclick="deletePosition('${p.id}')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-1 0v14a1 1 0 01-1 1H9a1 1 0 01-1-1V6"/></svg>
+      </button>
+    </td>
+  </tr>`;
+}
+
+function renderPosiciones(){
+  const list = filteredPositions();
+  return `
+  <div class="card">
+    <div class="card-head">
+      <h2>Todas las posiciones abiertas</h2>
+      <span class="hint">* precio cargado manualmente</span>
+    </div>
+    <div class="card-body">
+      <div class="filters">
+        <label class="field">Cartera
+          <select id="fCartera">${carterasPresentes().map(c=>`<option ${STATE.ui.filterCartera===c?'selected':''}>${c}</option>`).join('')}</select>
+        </label>
+        <label class="field">Grano
+          <select id="fGrano">${granosPresentes().map(c=>`<option ${STATE.ui.filterGrano===c?'selected':''}>${c}</option>`).join('')}</select>
+        </label>
+        <label class="field">Buscar
+          <input type="text" id="fSearch" placeholder="grano, estrategia, vto…" value="${STATE.ui.search}">
+        </label>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Ref.</th><th>Cartera</th><th>Instr.</th><th>Grano</th><th>Op</th><th>Vto</th><th class="num">Strike</th>
+            <th class="num">Tns</th><th class="num">$ Apert.</th><th class="num">$ Cierre</th><th class="num">Result. USD</th><th>Estrategia</th><th></th>
+          </tr></thead>
+          <tbody>
+            ${list.length? list.map(positionRow).join('') : `<tr><td colspan="13" class="small-muted" style="text-align:center;padding:24px;">No hay posiciones con estos filtros.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* =========================================================================
+   RENDER: Historial (posiciones cerradas)
+========================================================================= */
+function historialTable(legs){
+  if(!legs.length) return `<div class="small-muted" style="padding:10px 2px;">Sin posiciones.</div>`;
+  return `
+  <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th>Ref.</th><th>Grano</th><th>Instr.</th><th>Op</th><th>Vto</th>
+        <th class="num">Strike</th><th class="num">Tns</th><th class="num">$ Apert.</th><th class="num">$ Cierre op.</th><th>Fecha cierre</th><th class="num">Result.</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${legs.map(p=>`<tr>
+          <td class="small-muted">${p.referencia||'—'}</td>
+          <td>${p.grano}</td>
+          <td><span class="tag ${p.instrumento==='Futuro'?'tag-fut':'tag-op'}">${p.instrumento==='Futuro'?'Futuro':p.tipoOpcion}</span></td>
+          <td class="${p.operacion==='Compra'?'pill-compra':'pill-venta'}">${p.operacion}</td>
+          <td>${p.vencimiento}</td>
+          <td class="num">${p.strike?fmtMoney(Math.round(p.strike),0):'—'}</td>
+          <td class="num">${fmtTns(p.toneladas)}</td>
+          <td class="num">${fmtMoney(p.apertura,2)}</td>
+          <td class="num">${p.precioUsado!==null?fmtMoney(p.precioUsado,1):'<span class="val-na">s/d</span>'}</td>
+          <td class="small-muted">${p.fechaCierre||'—'}</td>
+          <td class="num">${fmtUSD(p.totalUSD)}</td>
+          <td style="white-space:nowrap;">
+            <button class="icon-btn" title="Editar" onclick="openEdit('${p.id}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+            </button>
+            <button class="icon-btn" title="Eliminar" onclick="deletePosition('${p.id}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-1 0v14a1 1 0 01-1 1H9a1 1 0 01-1-1V6"/></svg>
+            </button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+function historialEstrategiaGroups(legs){
+  const byId = {};
+  legs.forEach(p=>{ const k = p.estrategiaId||p.id; (byId[k]=byId[k]||[]).push(p); });
+  return Object.entries(byId).sort((a,b)=>(a[1][0].estrategia||'').localeCompare(b[1][0].estrategia||'')).map(([id,ls])=>`
+    <div style="margin-bottom:22px;padding:14px 16px;border:1px solid var(--border);border-radius:8px;background:#FBFCFA;">
+      <div style="font-weight:700;color:var(--teal-ink);margin-bottom:8px;">${ls[0].estrategia||'(sin nombre)'} <span class="small-muted" style="font-weight:400;">— estrategia cerrada</span></div>
+      ${historialTable(ls)}
+    </div>`).join('');
+}
+function renderHistorial(){
+  const cerradas = STATE.positions.filter(p=>p.estado==='Cerrada').map(enrich);
+  if(!cerradas.length){
+    return `<div class="empty card"><h3>Todavía no hay posiciones cerradas</h3><p>Cuando cierres una posición desde "Posiciones", va a aparecer acá clasificada igual que en el Resumen.</p></div>`;
+  }
+  const acopioSueltas = cerradas.filter(p=>p.cartera==='Acopio' && !p.estrategiaId);
+  const acopioEstrategias = cerradas.filter(p=>p.cartera==='Acopio' && p.estrategiaId);
+  const siembrasSueltas = cerradas.filter(p=>p.cartera==='Siembras' && !p.estrategiaId);
+  const siembrasEstrategias = cerradas.filter(p=>p.cartera==='Siembras' && p.estrategiaId);
+  return `
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head"><h2>Acopio</h2></div>
+      <div class="card-body">
+        <h3 style="font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:700;">Posiciones sueltas cerradas</h3>
+        ${historialTable(acopioSueltas)}
+        <h3 style="font-size:13px;color:var(--muted);margin:20px 0 8px;font-weight:700;">Estrategias cerradas</h3>
+        ${acopioEstrategias.length? historialEstrategiaGroups(acopioEstrategias) : '<div class="small-muted">Sin estrategias cerradas.</div>'}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Siembras</h2></div>
+      <div class="card-body">
+        <h3 style="font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:700;">Posiciones sueltas cerradas</h3>
+        ${historialTable(siembrasSueltas)}
+        <h3 style="font-size:13px;color:var(--muted);margin:20px 0 8px;font-weight:700;">Estrategias cerradas</h3>
+        ${siembrasEstrategias.length? historialEstrategiaGroups(siembrasEstrategias) : '<div class="small-muted">Sin estrategias cerradas.</div>'}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* =========================================================================
+   RENDER: Escenarios
+========================================================================= */
+function scenarioValueFor(p, precio, aplica){
+  if(precio===null || precio===undefined || precio==='' || isNaN(Number(precio))) return {valor:null, total:null};
+  let valorPosicion;
+  if(p.instrumento==='Opcion' || !aplica){
+    // Las opciones siempre quedan congeladas en su precio de apertura.
+    // Los futuros que no coinciden con Operación/Mes/Año elegidos también quedan congelados (impacto $0),
+    // porque no son el contrato que se quiere evaluar en este escenario.
+    valorPosicion = Number(p.apertura);
+  } else {
+    valorPosicion = Number(precio);
+  }
+  const diffUnit = p.operacion==='Venta' ? (Number(p.apertura)-valorPosicion) : (valorPosicion-Number(p.apertura));
+  const total = diffUnit*Number(p.toneladas||0);
+  return {valor:valorPosicion, total};
+}
+function pasaFiltrosEscenario(p){
+  // Cartera, Grano e Instrumento sí ocultan filas: acotan "dónde estoy mirando".
+  const f = STATE.ui.escenarioFiltros;
+  if(f.cartera!=='Todas' && p.cartera!==f.cartera) return false;
+  if(f.grano!=='Todos' && p.grano!==f.grano) return false;
+  if(!coincideInstrumento(p, f.instrumento)) return false;
+  return true;
+}
+function aplicaEscenarioA(p){
+  // Operación / Mes / Año NO ocultan filas: solo definen a cuáles se les aplica el precio del escenario.
+  const f = STATE.ui.escenarioFiltros;
+  if(f.operacion!=='Todas' && p.operacion!==f.operacion) return false;
+  if(f.mes!=='Todos' && (p.vencimiento||'').split('-')[1]!==f.mes) return false;
+  if(f.anio!=='Todos' && (p.vencimiento||'').split('-')[0]!==f.anio) return false;
+  return true;
+}
+function escenarioTable(legs, precio){
+  if(!legs.length) return `<div class="small-muted" style="padding:10px 2px;">Sin posiciones.</div>`;
+  return `
+  <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th>Ref.</th><th>Grano</th><th>Instr.</th><th>Op</th><th>Vto</th>
+        <th class="num">Strike</th><th class="num">Tns</th><th class="num">$ Apert.</th><th class="num">$ Escenario</th><th class="num">Result.</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${legs.map(p=>{
+          const aplica = aplicaEscenarioA(p);
+          const sc = scenarioValueFor(p, precio, aplica);
+          const congelada = precio!=='' && precio!==null && precio!==undefined && !isNaN(Number(precio)) && (p.instrumento==='Opcion' || !aplica);
+          return `<tr ${congelada?'style="opacity:.55;"':''}>
+            <td class="small-muted">${p.referencia||'—'}</td>
+            <td>${p.grano}</td>
+            <td><span class="tag ${p.instrumento==='Futuro'?'tag-fut':'tag-op'}">${p.instrumento==='Futuro'?'Futuro':p.tipoOpcion}</span></td>
+            <td class="${p.operacion==='Compra'?'pill-compra':'pill-venta'}">${p.operacion}</td>
+            <td>${p.vencimiento}</td>
+            <td class="num">${p.strike?fmtMoney(Math.round(p.strike),0):'—'}</td>
+            <td class="num">${fmtTns(p.toneladas)}</td>
+            <td class="num">${fmtMoney(p.apertura,2)}</td>
+            <td class="num">${sc.valor!==null?fmtMoney(sc.valor,1):'<span class="val-na">s/d</span>'}${congelada?' <span class="small-muted">(sin cambio)</span>':''}</td>
+            <td class="num">${fmtUSD(sc.total)}</td>
+            <td style="white-space:nowrap;">
+              <button class="icon-btn" title="Editar" onclick="openEdit('${p.id}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+              </button>
+              <button class="icon-btn" title="Eliminar" onclick="deletePosition('${p.id}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-1 0v14a1 1 0 01-1 1H9a1 1 0 01-1-1V6"/></svg>
+              </button>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+/* ---- Motor de diagnóstico de estrategias (Put Sintético / Piso y Techo / Pase) ---- */
+function diagnosticarEstrategia(legsCrudas, valuar, esEscenario){
+  valuar = valuar || enrich;
+  const enr = legsCrudas.map(valuar);
+  const futuros = enr.filter(l=>l.instrumento==='Futuro');
+  const calls = enr.filter(l=>l.instrumento==='Opcion' && l.tipoOpcion==='Call');
+  const puts = enr.filter(l=>l.instrumento==='Opcion' && l.tipoOpcion==='Put');
+  const totalReal = enr.reduce((a,p)=>a+(p.totalUSD||0),0);
+
+  // PASE ENTRE POSICIONES: 2 futuros, distinto mes, direcciones opuestas, sin opciones
+  if(futuros.length===2 && calls.length===0 && puts.length===0){
+    const [x,y] = futuros;
+    if(x.vencimiento!==y.vencimiento && x.operacion!==y.operacion){
+      const cercano = x.vencimiento < y.vencimiento ? x : y;
+      const lejano  = x.vencimiento < y.vencimiento ? y : x;
+      const sEntrada = lejano.apertura - cercano.apertura;
+      const sCierre = (lejano.precioUsado!==null && cercano.precioUsado!==null) ? (lejano.precioUsado - cercano.precioUsado) : null;
+      const [ay,am] = cercano.vencimiento.split('-').map(Number);
+      const [by,bm] = lejano.vencimiento.split('-').map(Number);
+      const diasDif = Math.max(1, Math.round((new Date(by,bm-1,1) - new Date(ay,am-1,1))/86400000));
+      const tna = sCierre!==null && cercano.precioUsado ? (sCierre/cercano.precioUsado)*(365/diasDif)*100 : null;
+      const ganaSiAchica = lejano.operacion==='Venta'; // vendido el lejano + comprado el cercano => gana si el pase se achica
+      let texto;
+      if(sCierre===null){
+        texto = `Todavía falta el precio${esEscenario?' de escenario':' de cierre'} de alguno de los dos meses para poder calcular el pase.`;
+      } else {
+        const seAchico = sCierre < sEntrada;
+        const favorable = (ganaSiAchica && seAchico) || (!ganaSiAchica && !seAchico);
+        texto = `${lejano.grano}: pase entre ${cercano.vencimiento} (cercano) y ${lejano.vencimiento} (lejano). `
+              + `Diferencia al armarlo: ${fmtMoney(sEntrada,2)} u$s/tn. Diferencia ${esEscenario?'en este escenario':'al cierre de hoy'}: ${fmtMoney(sCierre,2)} u$s/tn (se ${seAchico?'achicó':'ensanchó'}). `
+              + `Tu posición está ${ganaSiAchica?'vendida en el mes lejano y comprada en el cercano':'comprada en el mes lejano y vendida en el cercano'}, `
+              + `así que ganás si el pase se ${ganaSiAchica?'achica':'ensancha'}. ${esEscenario?'En este escenario estarías':'Hoy estás'} ${favorable?'a favor':'en contra'} de ese movimiento.`
+              + (tna!==null? ` Tasa implícita del pase: ${fmtMoney(tna,1)}% TNA.` : '');
+      }
+      return {tipo:'Pase entre posiciones', texto, totalReal, esEscenario};
+    }
+  }
+
+  // PISO Y TECHO (COLLAR): Put comprado + Call vendido
+  const putCompra = puts.filter(l=>l.operacion==='Compra');
+  const callVenta = calls.filter(l=>l.operacion==='Venta');
+  if(putCompra.length && callVenta.length){
+    const put = putCompra[0], call = callVenta[0];
+    const primaNeta = Number(put.apertura) - Number(call.apertura);
+    const piso = Number(put.strike) - primaNeta;
+    const techo = Number(call.strike) - primaNeta;
+    const futuroRef = futuros.find(f=>f.vencimiento===put.vencimiento) || futuros[0];
+    const precioMercado = futuroRef ? futuroRef.precioUsado : (esEscenario ? null : marketPriceFor({...put, instrumento:'Futuro', strike:0, tipoOpcion:''}));
+    let texto;
+    if(precioMercado===null || precioMercado===undefined){
+      texto = `Piso fijo: ${fmtMoney(piso,2)} u$s/tn. Techo fijo: ${fmtMoney(techo,2)} u$s/tn. (Todavía no hay precio${esEscenario?' de escenario':' de cierre'} del futuro de referencia para saber en qué tramo estás.)`;
+    } else if(precioMercado < Number(put.strike)){
+      texto = `El mercado ${esEscenario?'estaría en':'cerró en'} ${fmtMoney(precioMercado,2)}, por debajo de tu Put (strike ${fmtMoney(put.strike,0)}): estás protegido en el piso. Resultado fijo aproximado: ${fmtMoney(piso,2)} u$s/tn.`;
+    } else if(precioMercado > Number(call.strike)){
+      texto = `El mercado ${esEscenario?'estaría en':'cerró en'} ${fmtMoney(precioMercado,2)}, por encima de tu Call vendido (strike ${fmtMoney(call.strike,0)}): tu resultado quedó topado en el techo. Resultado fijo aproximado: ${fmtMoney(techo,2)} u$s/tn.`;
+    } else {
+      texto = `El mercado ${esEscenario?'estaría en':'cerró en'} ${fmtMoney(precioMercado,2)}, entre tu Put (${fmtMoney(put.strike,0)}) y tu Call (${fmtMoney(call.strike,0)}): tu resultado se mueve libremente con el precio, dentro del rango piso ${fmtMoney(piso,2)} / techo ${fmtMoney(techo,2)} u$s/tn.`;
+    }
+    return {tipo:'Piso y Techo (Collar)', texto, totalReal, esEscenario};
+  }
+
+  // PUT SINTÉTICO: Futuro vendido + Call comprado
+  const futuroVenta = futuros.filter(l=>l.operacion==='Venta');
+  const callCompra = calls.filter(l=>l.operacion==='Compra');
+  if(futuroVenta.length && callCompra.length){
+    const fut = futuroVenta[0];
+    const precioMercado = fut.precioUsado;
+    const callsOrdenados = callCompra.slice().sort((a,b)=>Number(a.strike)-Number(b.strike));
+    const principal = callsOrdenados[0];
+    const precioVenta = Number(fut.apertura);
+    const strike = Number(principal.strike);
+    const premium = Number(principal.apertura);
+    const perdidaEstructural = strike - precioVenta; // diferencia entre el futuro y el strike del Call
+    const pisoEfectivo = precioVenta - premium; // resultado neto por unidad una vez que el Call empieza a cubrir, descontando la prima
+    let texto;
+    if(precioMercado===null || precioMercado===undefined){
+      texto = `Vendiste el futuro a ${fmtMoney(precioVenta,2)} y compraste un Call strike ${fmtMoney(strike,0)} (prima ${fmtMoney(premium,2)}). Por encima de ${fmtMoney(strike,0)} tu pérdida queda limitada a ${fmtMoney(perdidaEstructural,2)} u$s/tn (más la prima). Todavía no hay precio${esEscenario?' de escenario':' de cierre'} del futuro para ubicarte.`;
+    } else if(precioMercado <= precioVenta){
+      texto = `El futuro ${esEscenario?'estaría en':'cerró en'} ${fmtMoney(precioMercado,2)}, en o por debajo de tu precio de venta (${fmtMoney(precioVenta,2)}): tu futuro está ganando ${fmtMoney(precioVenta-precioMercado,2)} u$s/tn, y el Call (strike ${fmtMoney(strike,0)}) no vale nada porque no llegó a su strike.`;
+    } else if(precioMercado <= strike){
+      texto = `El futuro ${esEscenario?'estaría en':'cerró en'} ${fmtMoney(precioMercado,2)}, por encima de tu precio de venta (${fmtMoney(precioVenta,2)}) pero todavía no llegó al strike de tu Call (${fmtMoney(strike,0)}): tu futuro está perdiendo ${fmtMoney(precioMercado-precioVenta,2)} u$s/tn, y esa pérdida todavía NO está cubierta por el Call (sigue valiendo cero). El Call recién empieza a compensar a partir de ${fmtMoney(strike,0)}.`;
+    } else {
+      texto = `El futuro ${esEscenario?'estaría en':'cerró en'} ${fmtMoney(precioMercado,2)}, por encima del strike de tu Call (${fmtMoney(strike,0)}): a partir de ahí, cualquier suba adicional del mercado la absorbe la ganancia del Call, así que tu pérdida en el futuro queda limitada a la diferencia entre tu precio de venta y el strike: ${fmtMoney(perdidaEstructural,2)} u$s/tn. Descontando la prima pagada por el Call (${fmtMoney(premium,2)}), tu precio de venta efectivo (piso sintético) queda fijo en aproximadamente ${fmtMoney(pisoEfectivo,2)} u$s/tn, no importa cuánto siga subiendo el mercado.`;
+    }
+    if(callsOrdenados.length>1){
+      texto += ` (Tenés ${callsOrdenados.length} Calls a distintos strikes; este diagnóstico usa el de strike más bajo, ${fmtMoney(strike,0)}, como referencia principal — a partir de los strikes más altos la cobertura se refuerza todavía más.)`;
+    }
+    return {tipo:'Put Sintético (Futuro vendido + Call comprado)', texto, totalReal, esEscenario};
+  }
+
+  return null;
+}
+function toggleDiagnostico(estrategiaId){
+  if(STATE.ui.diagnosticosAbiertos.has(estrategiaId)) STATE.ui.diagnosticosAbiertos.delete(estrategiaId);
+  else STATE.ui.diagnosticosAbiertos.add(estrategiaId);
+  render();
+}
+window.toggleDiagnostico = toggleDiagnostico;
+function diagnosticoPanelHTML(diag, estrategiaId){
+  if(!diag) return '';
+  const abierto = STATE.ui.diagnosticosAbiertos.has(estrategiaId);
+  return `
+  <div style="margin-bottom:10px;">
+    <button onclick="toggleDiagnostico('${estrategiaId}')" style="background:none;border:none;cursor:pointer;padding:2px 0;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--teal-ink);">
+      <span style="display:inline-block;transition:transform .15s;transform:rotate(${abierto?'90deg':'0deg'});">▸</span>
+      ${abierto?'Ocultar':'Ver'} diagnóstico (${diag.tipo})
+    </button>
+    ${abierto ? `
+    <div style="background:#F6F8F5;border:1px solid var(--border);border-left:3px solid var(--teal);border-radius:6px;padding:10px 14px;margin-top:6px;font-size:12.5px;line-height:1.5;">
+      <div style="color:var(--ink);">${diag.texto}</div>
+    </div>` : ''}
+  </div>`;
+}
+function escenarioEstrategiaGroups(legs, precio){
+  const byId = {};
+  legs.forEach(p=>{ const k = p.estrategiaId||p.id; (byId[k]=byId[k]||[]).push(p); });
+  const grupos = Object.entries(byId).sort((a,b)=> (a[1][0].estrategia||'').localeCompare(b[1][0].estrategia||''));
+  const valuarEscenario = p=>{
+    const aplica = aplicaEscenarioA(p);
+    const sc = scenarioValueFor(p, precio, aplica);
+    return {...p, precioUsado: sc.valor, totalUSD: sc.total};
+  };
+  return grupos.map(([estrategiaId,ls])=>{
+    const name = ls[0].estrategia || '(sin nombre)';
+    const diag = diagnosticarEstrategia(ls, valuarEscenario, true);
+    return `
+    <div style="margin-bottom:22px;padding:14px 16px;border:1px solid var(--border);border-radius:8px;background:#FBFCFA;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+        <span style="font-weight:700;color:var(--teal-ink);">${name}</span>
+        <button class="icon-btn" title="Editar estrategia (nombre y posiciones)" onclick="openEditStrategy('${estrategiaId}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+        </button>
+        <button class="icon-btn" title="Eliminar toda la estrategia" onclick="deleteStrategyGroup('${estrategiaId}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-1 0v14a1 1 0 01-1 1H9a1 1 0 01-1-1V6"/></svg>
+        </button>
+      </div>
+      ${diagnosticoPanelHTML(diag, 'esc_'+estrategiaId)}
+      ${escenarioTable(ls, precio)}
+    </div>`;
+  }).join('');
+}
+function escenarioFiltrosBarHTML(){
+  const f = STATE.ui.escenarioFiltros;
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-body">
+      <div class="filters">
+        <label class="field">Cartera
+          <select id="esCartera">${['Todas','Acopio','Siembras'].map(o=>`<option ${f.cartera===o?'selected':''}>${o}</option>`).join('')}</select>
+        </label>
+        <label class="field">Grano
+          <select id="esGrano">${['Todos',...granosPresentesResumen()].map(o=>`<option ${f.grano===o?'selected':''}>${o}</option>`).join('')}</select>
+        </label>
+        <label class="field">Instrumento
+          <select id="esInstrumento">${['Todos','Futuro','Call','Put'].map(o=>`<option value="${o}" ${f.instrumento===o?'selected':''}>${o==='Futuro'?'Futuros':(o==='Todos'?'Todos':'Opciones · '+o)}</option>`).join('')}</select>
+        </label>
+        <label class="field">Operación
+          <select id="esOperacion">${['Todas','Compra','Venta'].map(o=>`<option ${f.operacion===o?'selected':''}>${o}</option>`).join('')}</select>
+        </label>
+        <label class="field">Mes
+          <select id="esMes"><option value="Todos" ${f.mes==='Todos'?'selected':''}>Todos</option>${mesesPresentes().map(m=>`<option value="${m}" ${f.mes===m?'selected':''}>${MESES_FILTRO_LABEL[m]}</option>`).join('')}</select>
+        </label>
+        <label class="field">Año
+          <select id="esAnio"><option value="Todos" ${f.anio==='Todos'?'selected':''}>Todos</option>${aniosPresentes().map(a=>`<option ${f.anio===a?'selected':''}>${a}</option>`).join('')}</select>
+        </label>
+        <label class="field">$ (precio del escenario)
+          <input type="number" step="0.01" id="esPrecio" value="${f.precio}" placeholder="ej: 360">
+        </label>
+        <button class="btn btn-ghost btn-sm" id="btnResetFiltrosEscenario" style="align-self:flex-end;">Quitar filtros</button>
+      </div>
+      <p class="small-muted" style="margin-top:8px;margin-bottom:0;">Cartera y Grano acotan qué se muestra. Operación, Mes y Año no ocultan nada: solo definen a qué posiciones se les aplica el precio de "$" (el resto queda sin cambios, en gris). Las opciones (Call/Put) siempre quedan a su precio de apertura — solo se mueven los futuros.</p>
+    </div>
+  </div>`;
+}
+function renderEscenarios(){
+  const enriched = STATE.positions.filter(p=>p.estado==='Abierta');
+  if(!enriched.length){
+    return `<div class="empty card"><h3>No hay posiciones abiertas para simular</h3></div>`;
+  }
+  const f = STATE.ui.escenarioFiltros;
+  const precio = f.precio;
+  const filtradas = enriched.filter(pasaFiltrosEscenario);
+  const mostrarAcopio = f.cartera!=='Siembras';
+  const mostrarSiembras = f.cartera!=='Acopio';
+
+  const acopioSueltas = filtradas.filter(p=>p.cartera==='Acopio' && !p.estrategiaId);
+  const acopioEstrategias = filtradas.filter(p=>p.cartera==='Acopio' && p.estrategiaId);
+  const siembrasSueltas = filtradas.filter(p=>p.cartera==='Siembras' && !p.estrategiaId);
+  const siembrasEstrategias = filtradas.filter(p=>p.cartera==='Siembras' && p.estrategiaId);
+
+  const acopioCard = `
+    <div class="card">
+      <div class="card-head"><h2>Acopio</h2></div>
+      <div class="card-body">
+        <h3 style="font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:700;">Posiciones sueltas</h3>
+        ${escenarioTable(acopioSueltas, precio)}
+        <h3 style="font-size:13px;color:var(--muted);margin:20px 0 8px;font-weight:700;">Estrategias armadas</h3>
+        ${acopioEstrategias.length? escenarioEstrategiaGroups(acopioEstrategias, precio) : '<div class="small-muted">Sin estrategias armadas.</div>'}
+      </div>
+    </div>`;
+  const siembrasCard = `
+    <div class="card">
+      <div class="card-head"><h2>Siembras</h2></div>
+      <div class="card-body">
+        <h3 style="font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:700;">Posiciones sueltas</h3>
+        ${escenarioTable(siembrasSueltas, precio)}
+        <h3 style="font-size:13px;color:var(--muted);margin:20px 0 8px;font-weight:700;">Estrategias armadas</h3>
+        ${siembrasEstrategias.length? escenarioEstrategiaGroups(siembrasEstrategias, precio) : '<div class="small-muted">Sin estrategias armadas.</div>'}
+      </div>
+    </div>`;
+
+  return `
+  ${posicionNetaBadgesHTML(filtradas)}
+  ${escenarioFiltrosBarHTML()}
+  <div class="grid-2" style="${(!mostrarAcopio || !mostrarSiembras)?'grid-template-columns:1fr;':''}">
+    ${mostrarAcopio? acopioCard : ''}
+    ${mostrarSiembras? siembrasCard : ''}
+  </div>`;
+}
+
+/* =========================================================================
+   RENDER: Precios / Importación
+========================================================================= */
+function renderPrecios(){
+  const tickersFuturos = Object.keys(STATE.priceMap).filter(k=>!k.includes(' ')).length;
+  const tickersOpciones = Object.keys(STATE.priceMap).length - tickersFuturos;
+  return `
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head"><h2>Subir archivo(s)</h2></div>
+      <div class="card-body">
+        <p class="small-muted">Aceptamos (podés elegir o arrastrar varios a la vez):</p>
+        <ul class="small-muted" style="margin-top:0;padding-left:18px;">
+          <li>El Excel completo del MTR (pestañas "Posi Separada", "Base Futuros." y "Base Opciones.") — actualiza posiciones y precios juntos.</li>
+          <li>Uno o más CSV descargados de <strong>cem.matbarofex.com.ar</strong> (Rueda del día → Futuros y Opciones Agropecuaria) — actualiza solo precios de ajuste.</li>
+        </ul>
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple>
+          <div>📄 Arrastrá uno o varios archivos acá, o hacé clic para elegirlos</div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btnActualizarVista" style="margin-top:12px;">↻ Actualizar vista con los datos cargados</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Estado actual</h2></div>
+      <div class="card-body">
+        <p><strong>${Object.keys(STATE.priceMap).length}</strong> contratos con precio de ajuste cargado (${tickersFuturos} futuros, ${tickersOpciones} opciones).</p>
+        <p class="small-muted">Última actualización: ${STATE.priceMeta.fecha || 'sin datos'} ${STATE.priceMeta.fuente?`(${STATE.priceMeta.fuente})`:''}</p>
+        <p class="small-muted">Cómo lo tomamos: en <em>cem.matbarofex.com.ar</em> → Rueda del día → Futuros y Opciones Agropecuaria → columna "Ajuste / Prima Ref.". El nombre del contrato (ticker) se arma igual que en tu Excel: <code>GRANO.ROS/MESAño</code> para futuros y <code>GRANO.ROS/MESAño Strike C|P</code> para opciones. Los números con coma decimal (ej: 215,70) se interpretan correctamente.</p>
+        <p class="small-muted">Si una posición no encuentra su precio automáticamente, podés cargarlo a mano desde la pestaña <button class="link-btn" onclick="setTab('posiciones')">Posiciones</button> (editar → precio de cierre manual).</p>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px;">
+    <div class="card-head"><h2>Datos de ejemplo</h2></div>
+    <div class="card-body">
+      <p class="small-muted">Este dashboard puede recargarse con las posiciones y precios de tu archivo <code>MTR_Rofex_Posi.xlsx</code> original en cualquier momento, descartando lo que hayas cargado en este navegador desde entonces.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="btnReloadSeed">Recargar datos del Excel original</button>
+        <button class="btn btn-danger" id="btnResetAll">Vaciar todo (dejar en blanco)</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* =========================================================================
+   MODAL: alta/edición de posición
+========================================================================= */
+let modalDraftLegs = [];
+let modalDraftNombreEstrategia = '';
+let modalDraftCarteraEstrategia = 'Acopio';
+let modalEditingStrategyOriginal = null; // {cartera, nombre} cuando se edita una estrategia ya cargada
+
+function blankDraftLeg(){
+  return {grano:'Soja', granoEsOtro:false, instrumento:'Futuro', operacion:'Venta', vencimiento:'', tipoOpcion:'Call', strike:'', toneladas:'', apertura:''};
+}
+
+function draftLegRowHTML(leg, idx){
+  const esOtroGrano = !!leg.granoEsOtro;
+  return `
+  <div class="card" style="padding:12px 14px;margin-bottom:10px;position:relative;background:#FAFBF9;">
+    ${modalDraftLegs.length>1 ? `
+    <button class="icon-btn" data-remove-leg="${idx}" title="Quitar esta pata" style="position:absolute;top:8px;right:8px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>` : ''}
+    <div class="small-muted" style="font-weight:700;margin-bottom:8px;">Pata ${idx+1}</div>
+    <div class="form-grid">
+      <label class="field">Grano
+        <select data-leg-idx="${idx}" data-leg-field="grano">${GRANOS_SUGERIDOS.map(g=>`<option ${!esOtroGrano && leg.grano===g?'selected':''}>${g}</option>`).join('')}<option value="__otro__" ${esOtroGrano?'selected':''}>Otro…</option></select>
+      </label>
+      <label class="field" style="${esOtroGrano?'':'display:none;'}" data-leg-otro-wrap="${idx}">Especificar grano
+        <input type="text" data-leg-idx="${idx}" data-leg-field="granoOtro" value="${esOtroGrano?leg.grano:''}">
+      </label>
+      <label class="field">Instrumento
+        <select data-leg-idx="${idx}" data-leg-field="instrumento">
+          <option value="Futuro" ${leg.instrumento==='Futuro'?'selected':''}>Futuro</option>
+          <option value="Opcion" ${leg.instrumento==='Opcion'?'selected':''}>Opción</option>
+        </select>
+      </label>
+      <label class="field">Operación
+        <select data-leg-idx="${idx}" data-leg-field="operacion">
+          <option ${leg.operacion==='Venta'?'selected':''}>Venta</option>
+          <option ${leg.operacion==='Compra'?'selected':''}>Compra</option>
+        </select>
+      </label>
+      <label class="field">Vencimiento
+        <input type="month" data-leg-idx="${idx}" data-leg-field="vencimiento" value="${leg.vencimiento||''}">
+      </label>
+      <label class="field" data-leg-tipo-wrap="${idx}" style="${leg.instrumento==='Opcion'?'':'display:none;'}">Tipo de opción
+        <select data-leg-idx="${idx}" data-leg-field="tipoOpcion">
+          <option ${leg.tipoOpcion==='Call'?'selected':''}>Call</option>
+          <option ${leg.tipoOpcion==='Put'?'selected':''}>Put</option>
+        </select>
+      </label>
+      <label class="field" data-leg-strike-wrap="${idx}" style="${leg.instrumento==='Opcion'?'':'display:none;'}">Strike (u$s/tn)
+        <input type="number" step="0.01" data-leg-idx="${idx}" data-leg-field="strike" value="${leg.strike||''}">
+      </label>
+      <label class="field">Toneladas
+        <input type="number" step="1" data-leg-idx="${idx}" data-leg-field="toneladas" value="${leg.toneladas||''}">
+      </label>
+      <label class="field">Precio / prima de apertura (u$s/tn)
+        <input type="number" step="0.01" data-leg-idx="${idx}" data-leg-field="apertura" value="${leg.apertura||''}">
+      </label>
+    </div>
+  </div>`;
+}
+
+function estrategiaFormHTML(isEditingExisting){
+  return `
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" style="max-width:720px;">
+      <h3>${isEditingExisting ? 'Editar estrategia' : 'Nueva estrategia'}</h3>
+      <div class="modal-sub">${isEditingExisting ? 'Cambiá el nombre y/o las posiciones que arman esta estrategia.' : 'Cargá juntas las posiciones que arman esta estrategia. Van a aparecer agrupadas en el Resumen.'}</div>
+      ${!isEditingExisting ? `
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:13px;font-weight:600;color:var(--teal-ink);">
+        <input type="checkbox" id="mEsEstrategia" checked style="width:16px;height:16px;"> Estrategia (varias posiciones juntas)
+      </label>` : ''}
+      <div class="form-grid" style="margin-bottom:14px;">
+        <label class="field">Cartera
+          ${isEditingExisting
+            ? `<input type="text" value="${modalDraftCarteraEstrategia}" disabled style="background:#F1F3EF;color:var(--muted);">`
+            : `<select id="mCarteraEstrategia">${['Acopio','Siembras'].map(o=>`<option ${modalDraftCarteraEstrategia===o?'selected':''}>${o}</option>`).join('')}</select>`}
+        </label>
+        <label class="field">Nombre de la estrategia
+          <input type="text" id="mNombreEstrategia" value="${modalDraftNombreEstrategia}" placeholder="ej: Put Sintético Nov26">
+        </label>
+      </div>
+      ${modalDraftLegs.map((leg,idx)=>draftLegRowHTML(leg,idx)).join('')}
+      <button class="btn btn-ghost btn-sm" id="btnAddLeg">+ Agregar otra pata</button>
+      <div class="modal-actions" style="justify-content:${isEditingExisting?'space-between':'flex-end'};">
+        ${isEditingExisting ? `<button class="btn btn-danger" id="btnDeleteStrategyFromModal">Eliminar estrategia completa</button>` : ''}
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-ghost" id="btnCancelModal">Cancelar</button>
+          <button class="btn btn-primary" id="btnSaveEstrategia">${isEditingExisting ? 'Guardar cambios' : 'Guardar estrategia'}</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function positionFormHTML(p){
+  const isEdit = !!p;
+  const v = p || {cartera:'Acopio', instrumento:'Futuro', grano:'Soja', operacion:'Venta', vencimiento:'', tipoOpcion:'Call', strike:'', toneladas:'', apertura:'', estrategia:'', notas:'', cierreManual:''};
+  return `
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <h3>${isEdit?'Editar posición':'Nueva posición'}</h3>
+      <div class="modal-sub">Cargá los datos tal como los armaste en el MTR.</div>
+      ${!isEdit ? `
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:13px;font-weight:600;color:var(--teal-ink);">
+        <input type="checkbox" id="mEsEstrategia" style="width:16px;height:16px;"> Estrategia (varias posiciones juntas)
+      </label>` : ''}
+      <div class="form-grid">
+        <label class="field">Cartera
+          <select id="mCartera">${['Acopio','Siembras'].map(o=>`<option ${v.cartera===o?'selected':''}>${o}</option>`).join('')}</select>
+        </label>
+        <label class="field">Instrumento
+          <select id="mInstrumento">${['Futuro','Opcion'].map(o=>`<option value="${o}" ${v.instrumento===o?'selected':''}>${o==='Futuro'?'Futuro':'Opción'}</option>`).join('')}</select>
+        </label>
+        <label class="field">Grano
+          <select id="mGrano">${GRANOS_SUGERIDOS.map(g=>`<option value="${g}" ${v.grano===g?'selected':''}>${g}</option>`).join('')}<option value="__otro__" ${v.grano && !GRANOS_SUGERIDOS.includes(v.grano)?'selected':''}>Otro…</option></select>
+        </label>
+        <label class="field" id="wrapGranoOtro" style="${v.grano && !GRANOS_SUGERIDOS.includes(v.grano)?'':'display:none;'}">Especificar grano
+          <input type="text" id="mGranoOtro" value="${v.grano && !GRANOS_SUGERIDOS.includes(v.grano)?v.grano:''}" placeholder="ej: Cebada cervecera">
+        </label>
+        <label class="field">Operación
+          <select id="mOperacion">${['Venta','Compra'].map(o=>`<option ${v.operacion===o?'selected':''}>${o}</option>`).join('')}</select>
+        </label>
+        <label class="field">Vencimiento (mes del contrato)
+          <input type="month" id="mVencimiento" value="${v.vencimiento||''}">
+        </label>
+        <label class="field" id="wrapTipoOpcion" style="${v.instrumento==='Opcion'?'':'display:none;'}">Tipo de opción
+          <select id="mTipoOpcion">${['Call','Put'].map(o=>`<option ${v.tipoOpcion===o?'selected':''}>${o}</option>`).join('')}</select>
+        </label>
+        <label class="field" id="wrapStrike" style="${v.instrumento==='Opcion'?'':'display:none;'}">Strike (u$s/tn)
+          <input type="number" step="0.01" id="mStrike" value="${v.strike||''}">
+        </label>
+        <label class="field">Toneladas
+          <input type="number" step="1" id="mToneladas" value="${v.toneladas||''}">
+        </label>
+        <label class="field">Precio / prima de apertura (u$s/tn)
+          <input type="number" step="0.01" id="mApertura" value="${v.apertura||''}">
+        </label>
+        <label class="field">Precio de cierre manual (opcional)
+          <input type="number" step="0.01" id="mCierreManual" value="${v.cierreManual!==null&&v.cierreManual!==undefined?v.cierreManual:''}" placeholder="si no lo cargás, se busca automático">
+        </label>
+        <label class="field">Referencia (número del MTR, opcional)
+          <input type="text" id="mReferencia" value="${v.referencia||''}" placeholder="ej: 3)">
+        </label>
+        ${v.estrategiaId ? `
+        <label class="field full">Estrategia (parte de un grupo)
+          <input type="text" value="${v.estrategia||''}" disabled style="background:#F1F3EF;color:var(--muted);">
+        </label>
+        <div class="small-muted" style="grid-column:1/-1;margin-top:-8px;">Para renombrar o modificar esta estrategia completa (todas sus patas), usá el lápiz de la estrategia en el Resumen.</div>
+        ` : ''}
+        <label class="field full">Notas
+          <input type="text" id="mNotas" value="${v.notas||''}" placeholder="observaciones, cliente, etc.">
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnCancelModal">Cancelar</button>
+        <button class="btn btn-primary" id="btnSaveModal">${isEdit?'Guardar cambios':'Agregar posición'}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function closeFormHTML(p){
+  return `
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" style="max-width:420px;">
+      <h3>Cerrar posición</h3>
+      <div class="modal-sub">${p.grano} · ${p.operacion} · ${p.vencimiento} · ${fmtTns(p.toneladas)} tns</div>
+      <div class="form-grid">
+        <label class="field full">Precio al que se cerró/canceló (u$s/tn)
+          <input type="number" step="0.01" id="mPrecioCierre" value="">
+        </label>
+        <label class="field full">Fecha de cierre
+          <input type="date" id="mFechaCierre" value="${new Date().toISOString().slice(0,10)}">
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnCancelModal">Cancelar</button>
+        <button class="btn btn-primary" id="btnConfirmClose">Confirmar cierre</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* =========================================================================
+   RENDER PRINCIPAL
+========================================================================= */
+function renderPositionModal(){
+  if(STATE.ui.editingPosition==='estrategia-edit') return estrategiaFormHTML(true);
+  if(STATE.ui.editingPosition===true && STATE.ui.modalEstrategiaMode) return estrategiaFormHTML(false);
+  return positionFormHTML(STATE.ui.editingPosition===true?null:STATE.ui.editingPosition);
+}
+
+function render(){
+  const app = document.getElementById('app');
+  const bodies = {
+    dashboard: renderDashboard,
+    posiciones: renderPosiciones,
+    escenarios: renderEscenarios,
+    datos: renderPrecios,
+    historial: renderHistorial,
+  };
+  app.innerHTML = `
+    ${renderSidebar()}
+    <div class="main">
+      ${STATE.seedOutdated ? `
+      <div style="background:#FFF4E5;border-bottom:1px solid #F0C36D;color:#7A4B00;padding:10px 28px;font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <span>Hay una versión más nueva de los datos base de este dashboard (mejoras recientes). Si no hiciste cambios propios importantes, convendría recargarlos.</span>
+        <span style="display:flex;gap:8px;flex:none;">
+          <button class="btn btn-primary btn-sm" id="btnBannerReload">Recargar datos nuevos</button>
+          <button class="btn btn-ghost btn-sm" id="btnBannerDismiss">Ya lo sé, ignorar</button>
+        </span>
+      </div>` : ''}
+      ${renderTopbar()}
+      <div class="content">${bodies[STATE.ui.tab]()}</div>
+    </div>
+    ${STATE.ui.editingPosition!==null && STATE.ui.editingPosition!=='close' ? renderPositionModal() : ''}
+    ${STATE.ui.closingPosition ? closeFormHTML(STATE.ui.closingPosition) : ''}
+    ${pendingConfirmAction ? confirmModalHTML() : ''}
+  `;
+  wireEvents();
+}
+
+/* =========================================================================
+   EVENTOS
+========================================================================= */
+function openEdit(id){
+  const p = STATE.positions.find(x=>x.id===id);
+  STATE.ui.editingPosition = p;
+  render();
+}
+function openAdd(){
+  STATE.ui.editingPosition = true;
+  STATE.ui.modalEstrategiaMode = false;
+  modalDraftLegs = [blankDraftLeg(), blankDraftLeg()];
+  modalDraftNombreEstrategia = '';
+  modalDraftCarteraEstrategia = 'Acopio';
+  modalEditingStrategyOriginal = null;
+  render();
+}
+function openClose(id){
+  const p = STATE.positions.find(x=>x.id===id);
+  STATE.ui.closingPosition = p;
+  render();
+}
+function deletePosition(id){
+  askConfirm('¿Eliminar esta posición? No se puede deshacer.', ()=>{
+    STATE.positions = STATE.positions.filter(x=>x.id!==id);
+    savePositions();
+    render();
+    toast('Posición eliminada.');
+  });
+}
+function openEditStrategy(estrategiaId){
+  const legs = STATE.positions.filter(p=>p.estado==='Abierta' && p.estrategiaId===estrategiaId);
+  if(!legs.length){ toast('No encontré esa estrategia.','err'); return; }
+  modalDraftLegs = legs.map(p=>({
+    id: p.id,
+    grano: p.grano,
+    granoEsOtro: !GRANOS_SUGERIDOS.includes(p.grano),
+    instrumento: p.instrumento,
+    operacion: p.operacion,
+    vencimiento: p.vencimiento,
+    tipoOpcion: p.tipoOpcion || 'Call',
+    strike: p.strike || '',
+    toneladas: p.toneladas,
+    apertura: p.apertura,
+  }));
+  modalDraftNombreEstrategia = legs[0].estrategia || '';
+  modalDraftCarteraEstrategia = legs[0].cartera;
+  modalEditingStrategyOriginal = {estrategiaId, cartera: legs[0].cartera, nombre: legs[0].estrategia || ''};
+  STATE.ui.editingPosition = 'estrategia-edit';
+  render();
+}
+function deleteStrategyGroup(estrategiaId){
+  const legs = STATE.positions.filter(p=>p.estado==='Abierta' && p.estrategiaId===estrategiaId);
+  if(!legs.length) return;
+  const nombre = legs[0].estrategia || '(sin nombre)';
+  askConfirm(`¿Eliminar la estrategia completa "${nombre}" (${legs.length} posiciones)? No se puede deshacer.`, ()=>{
+    STATE.positions = STATE.positions.filter(p=> !(p.estado==='Abierta' && p.estrategiaId===estrategiaId));
+    savePositions();
+    render();
+    toast('Estrategia eliminada.');
+  });
+}
+window.openEdit = openEdit;
+window.openClose = openClose;
+window.deletePosition = deletePosition;
+window.openEditStrategy = openEditStrategy;
+window.deleteStrategyGroup = deleteStrategyGroup;
+window.setTab = setTab;
+
+function wireEvents(){
+  document.querySelectorAll('.navbtn').forEach(b=> b.onclick = ()=> setTab(b.dataset.tab));
+  const btnAdd = document.getElementById('btnAddPos');
+  if(btnAdd) btnAdd.onclick = openAdd;
+  const btnAddEmpty = document.getElementById('btnAddPosEmpty');
+  if(btnAddEmpty) btnAddEmpty.onclick = openAdd;
+
+  // filtros posiciones
+  const fCartera = document.getElementById('fCartera');
+  if(fCartera) fCartera.onchange = e=>{ STATE.ui.filterCartera=e.target.value; render(); };
+  const fGrano = document.getElementById('fGrano');
+  if(fGrano) fGrano.onchange = e=>{ STATE.ui.filterGrano=e.target.value; render(); };
+  const fEstado = document.getElementById('fEstado');
+  if(fEstado) fEstado.onchange = e=>{ STATE.ui.filterEstado=e.target.value; render(); };
+  const fSearch = document.getElementById('fSearch');
+  if(fSearch){
+    fSearch.oninput = e=>{ STATE.ui.search=e.target.value; };
+    fSearch.onkeydown = e=>{ if(e.key==='Enter') render(); };
+    fSearch.onblur = ()=> render();
+  }
+
+  // filtros resumen
+  const rfCartera = document.getElementById('rfCartera');
+  if(rfCartera) rfCartera.onchange = e=>{ STATE.ui.resumenFiltros.cartera=e.target.value; render(); };
+  const rfGrano = document.getElementById('rfGrano');
+  if(rfGrano) rfGrano.onchange = e=>{ STATE.ui.resumenFiltros.grano=e.target.value; render(); };
+  const rfInstrumento = document.getElementById('rfInstrumento');
+  if(rfInstrumento) rfInstrumento.onchange = e=>{ STATE.ui.resumenFiltros.instrumento=e.target.value; render(); };
+  const rfOperacion = document.getElementById('rfOperacion');
+  if(rfOperacion) rfOperacion.onchange = e=>{ STATE.ui.resumenFiltros.operacion=e.target.value; render(); };
+  const rfMes = document.getElementById('rfMes');
+  if(rfMes) rfMes.onchange = e=>{ STATE.ui.resumenFiltros.mes=e.target.value; render(); };
+  const rfAnio = document.getElementById('rfAnio');
+  if(rfAnio) rfAnio.onchange = e=>{ STATE.ui.resumenFiltros.anio=e.target.value; render(); };
+  const rfPrecio = document.getElementById('rfPrecio');
+  if(rfPrecio){
+    rfPrecio.oninput = e=>{ STATE.ui.resumenFiltros.precio=e.target.value; };
+    rfPrecio.onkeydown = e=>{ if(e.key==='Enter') render(); };
+    rfPrecio.onblur = ()=> render();
+  }
+  const btnResetFiltrosResumen = document.getElementById('btnResetFiltrosResumen');
+  if(btnResetFiltrosResumen) btnResetFiltrosResumen.onclick = ()=>{
+    STATE.ui.resumenFiltros = {cartera:'Todas', grano:'Todos', instrumento:'Todos', operacion:'Todas', mes:'Todos', anio:'Todos', precio:''};
+    render();
+  };
+
+  // modal alta/edicion
+  const mGranoSel = document.getElementById('mGrano');
+  if(mGranoSel){
+    mGranoSel.onchange = ()=>{
+      document.getElementById('wrapGranoOtro').style.display = mGranoSel.value==='__otro__' ? '' : 'none';
+    };
+  }
+  const mInstrumento = document.getElementById('mInstrumento');
+  if(mInstrumento){
+    mInstrumento.onchange = ()=>{
+      const isOp = mInstrumento.value==='Opcion';
+      document.getElementById('wrapTipoOpcion').style.display = isOp?'':'none';
+      document.getElementById('wrapStrike').style.display = isOp?'':'none';
+    };
+  }
+  const btnConfirmYes = document.getElementById('btnConfirmYes');
+  if(btnConfirmYes) btnConfirmYes.onclick = ()=>{
+    const action = pendingConfirmAction;
+    pendingConfirmAction = null;
+    if(action) action();
+  };
+  const btnConfirmNo = document.getElementById('btnConfirmNo');
+  if(btnConfirmNo) btnConfirmNo.onclick = ()=>{ pendingConfirmAction = null; render(); };
+
+  const btnCancelModal = document.getElementById('btnCancelModal');
+  if(btnCancelModal) btnCancelModal.onclick = ()=>{ STATE.ui.editingPosition=null; STATE.ui.closingPosition=null; STATE.ui.modalEstrategiaMode=false; modalEditingStrategyOriginal=null; render(); };
+
+  const mEsEstrategia = document.getElementById('mEsEstrategia');
+  if(mEsEstrategia){
+    mEsEstrategia.onchange = ()=>{
+      STATE.ui.modalEstrategiaMode = mEsEstrategia.checked;
+      if(STATE.ui.modalEstrategiaMode && modalDraftLegs.length<2){ modalDraftLegs = [blankDraftLeg(), blankDraftLeg()]; }
+      render();
+    };
+  }
+
+  const btnAddLeg = document.getElementById('btnAddLeg');
+  if(btnAddLeg) btnAddLeg.onclick = ()=>{ modalDraftLegs.push(blankDraftLeg()); render(); };
+
+  const mCarteraEstrategia = document.getElementById('mCarteraEstrategia');
+  if(mCarteraEstrategia) mCarteraEstrategia.onchange = ()=>{ modalDraftCarteraEstrategia = mCarteraEstrategia.value; };
+  const mNombreEstrategia = document.getElementById('mNombreEstrategia');
+  if(mNombreEstrategia) mNombreEstrategia.oninput = ()=>{ modalDraftNombreEstrategia = mNombreEstrategia.value; };
+
+  document.querySelectorAll('[data-remove-leg]').forEach(btn=>{
+    btn.onclick = ()=>{
+      modalDraftLegs.splice(Number(btn.dataset.removeLeg), 1);
+      render();
+    };
+  });
+
+  document.querySelectorAll('[data-leg-field]').forEach(inp=>{
+    const handler = e=>{
+      const idx = Number(e.target.dataset.legIdx);
+      const field = e.target.dataset.legField;
+      if(field==='grano'){
+        if(e.target.value==='__otro__'){ modalDraftLegs[idx].granoEsOtro = true; }
+        else { modalDraftLegs[idx].granoEsOtro = false; modalDraftLegs[idx].grano = e.target.value; }
+        render();
+      } else if(field==='granoOtro'){
+        modalDraftLegs[idx].grano = e.target.value;
+      } else if(field==='instrumento'){
+        modalDraftLegs[idx][field] = e.target.value;
+        render();
+      } else {
+        modalDraftLegs[idx][field] = e.target.value;
+      }
+    };
+    inp.oninput = handler;
+    inp.onchange = handler;
+  });
+
+  const btnSaveEstrategia = document.getElementById('btnSaveEstrategia');
+  if(btnSaveEstrategia) btnSaveEstrategia.onclick = ()=>{
+    const isEditingExisting = !!modalEditingStrategyOriginal;
+    const cartera = isEditingExisting ? modalEditingStrategyOriginal.cartera : document.getElementById('mCarteraEstrategia').value;
+    const nombre = document.getElementById('mNombreEstrategia').value.trim();
+    if(!nombre){ toast('Ponele un nombre a la estrategia.','err'); return; }
+    if(modalDraftLegs.length<2){ toast('Una estrategia necesita al menos 2 patas.','err'); return; }
+    for(const leg of modalDraftLegs){
+      if(!leg.grano || !leg.vencimiento || !leg.toneladas || !leg.apertura){
+        toast('Completá grano, vencimiento, toneladas y precio de apertura en todas las patas.','err');
+        return;
+      }
+    }
+    const buildFields = leg=>({
+      cartera,
+      instrumento: leg.instrumento,
+      grano: leg.grano,
+      operacion: leg.operacion,
+      vencimiento: leg.vencimiento,
+      tipoOpcion: leg.instrumento==='Opcion' ? leg.tipoOpcion : '',
+      strike: leg.instrumento==='Opcion' ? Number(leg.strike)||0 : 0,
+      toneladas: Number(leg.toneladas)||0,
+      apertura: Number(leg.apertura)||0,
+      estrategia: nombre,
+    });
+
+    if(isEditingExisting){
+      const estrategiaId = modalEditingStrategyOriginal.estrategiaId;
+      const idsEnFormulario = new Set(modalDraftLegs.filter(l=>l.id).map(l=>l.id));
+      // Actualiza las patas existentes, agrega las nuevas (sin id) y borra las que se hayan quitado del formulario.
+      // Todo se identifica por estrategiaId, nunca por el nombre (para no mezclar con otra estrategia homónima).
+      STATE.positions = STATE.positions
+        .filter(p=> !(p.estado==='Abierta' && p.estrategiaId===estrategiaId) || idsEnFormulario.has(p.id))
+        .map(p=>{
+          const leg = modalDraftLegs.find(l=>l.id===p.id);
+          return leg ? {...p, ...buildFields(leg)} : p;
+        });
+      const nuevasSinId = modalDraftLegs.filter(l=>!l.id).map(leg=>({
+        id: uid(), ...buildFields(leg), estrategiaId, referencia:'', notas:'', estado:'Abierta', origen:'manual',
+        fechaAlta:new Date().toISOString().slice(0,10), cierreManual:null, fechaCierre:null, precioCierreOperacion:null,
+      }));
+      STATE.positions = STATE.positions.concat(nuevasSinId);
+      savePositions();
+      STATE.ui.editingPosition = null;
+      modalEditingStrategyOriginal = null;
+      render();
+      toast(`Estrategia "${nombre}" actualizada.`);
+    } else {
+      const estrategiaId = uid();
+      const nuevas = modalDraftLegs.map(leg=>({
+        id: uid(), ...buildFields(leg), estrategiaId, referencia:'', notas:'', estado:'Abierta', origen:'manual',
+        fechaAlta:new Date().toISOString().slice(0,10), cierreManual:null, fechaCierre:null, precioCierreOperacion:null,
+      }));
+      STATE.positions = STATE.positions.concat(nuevas);
+      savePositions();
+      STATE.ui.editingPosition = null;
+      STATE.ui.modalEstrategiaMode = false;
+      render();
+      toast(`Estrategia "${nombre}" agregada con ${nuevas.length} patas.`);
+    }
+  };
+
+  const btnDeleteStrategyFromModal = document.getElementById('btnDeleteStrategyFromModal');
+  if(btnDeleteStrategyFromModal) btnDeleteStrategyFromModal.onclick = ()=>{
+    if(!modalEditingStrategyOriginal) return;
+    const {estrategiaId, nombre} = modalEditingStrategyOriginal;
+    askConfirm(`¿Eliminar la estrategia completa "${nombre}"? No se puede deshacer.`, ()=>{
+      STATE.positions = STATE.positions.filter(p=> !(p.estado==='Abierta' && p.estrategiaId===estrategiaId));
+      savePositions();
+      STATE.ui.editingPosition = null;
+      modalEditingStrategyOriginal = null;
+      render();
+      toast('Estrategia eliminada.');
+    });
+  };
+
+  const btnSaveModal = document.getElementById('btnSaveModal');
+  if(btnSaveModal) btnSaveModal.onclick = ()=>{
+    const isEdit = STATE.ui.editingPosition!==true;
+    const base = isEdit ? {...STATE.ui.editingPosition} : {
+      id: uid(), estado:'Abierta', origen:'manual', estrategia:'', estrategiaId:null, fechaAlta:new Date().toISOString().slice(0,10), fechaCierre:null, precioCierreOperacion:null,
+    };
+    const instrumento = document.getElementById('mInstrumento').value;
+    const cierreManualVal = document.getElementById('mCierreManual').value;
+    const obj = {
+      ...base,
+      cartera: document.getElementById('mCartera').value,
+      instrumento,
+      grano: (document.getElementById('mGrano').value==='__otro__' ? document.getElementById('mGranoOtro').value.trim() : document.getElementById('mGrano').value),
+      operacion: document.getElementById('mOperacion').value,
+      vencimiento: document.getElementById('mVencimiento').value,
+      tipoOpcion: instrumento==='Opcion' ? document.getElementById('mTipoOpcion').value : '',
+      strike: instrumento==='Opcion' ? Number(document.getElementById('mStrike').value)||0 : 0,
+      toneladas: Number(document.getElementById('mToneladas').value)||0,
+      apertura: Number(document.getElementById('mApertura').value)||0,
+      cierreManual: cierreManualVal!=='' ? Number(cierreManualVal) : null,
+      referencia: document.getElementById('mReferencia').value.trim(),
+      notas: document.getElementById('mNotas').value.trim(),
+    };
+    if(!obj.grano || !obj.vencimiento || !obj.toneladas || !obj.apertura){
+      toast('Completá al menos grano, vencimiento, toneladas y precio de apertura.','err');
+      return;
+    }
+    if(isEdit){
+      STATE.positions = STATE.positions.map(p=> p.id===obj.id? obj : p);
+    } else {
+      STATE.positions.push(obj);
+    }
+    savePositions();
+    STATE.ui.editingPosition = null;
+    render();
+    toast(isEdit? 'Posición actualizada.' : 'Posición agregada.');
+  };
+
+  const btnConfirmClose = document.getElementById('btnConfirmClose');
+  if(btnConfirmClose) btnConfirmClose.onclick = ()=>{
+    const precio = Number(document.getElementById('mPrecioCierre').value);
+    const fecha = document.getElementById('mFechaCierre').value;
+    if(isNaN(precio)){ toast('Ingresá un precio de cierre válido.','err'); return; }
+    const id = STATE.ui.closingPosition.id;
+    STATE.positions = STATE.positions.map(p=> p.id===id ? {...p, estado:'Cerrada', precioCierreOperacion:precio, fechaCierre:fecha} : p);
+    savePositions();
+    STATE.ui.closingPosition = null;
+    render();
+    toast('Posición cerrada.');
+  };
+
+  // filtros escenarios
+  const esCartera = document.getElementById('esCartera');
+  if(esCartera) esCartera.onchange = e=>{ STATE.ui.escenarioFiltros.cartera=e.target.value; render(); };
+  const esGrano = document.getElementById('esGrano');
+  if(esGrano) esGrano.onchange = e=>{ STATE.ui.escenarioFiltros.grano=e.target.value; render(); };
+  const esInstrumento = document.getElementById('esInstrumento');
+  if(esInstrumento) esInstrumento.onchange = e=>{ STATE.ui.escenarioFiltros.instrumento=e.target.value; render(); };
+  const esOperacion = document.getElementById('esOperacion');
+  if(esOperacion) esOperacion.onchange = e=>{ STATE.ui.escenarioFiltros.operacion=e.target.value; render(); };
+  const esMes = document.getElementById('esMes');
+  if(esMes) esMes.onchange = e=>{ STATE.ui.escenarioFiltros.mes=e.target.value; render(); };
+  const esAnio = document.getElementById('esAnio');
+  if(esAnio) esAnio.onchange = e=>{ STATE.ui.escenarioFiltros.anio=e.target.value; render(); };
+  const esPrecio = document.getElementById('esPrecio');
+  if(esPrecio){
+    esPrecio.oninput = e=>{ STATE.ui.escenarioFiltros.precio=e.target.value; };
+    esPrecio.onkeydown = e=>{ if(e.key==='Enter') render(); };
+    esPrecio.onblur = ()=> render();
+  }
+  const btnResetFiltrosEscenario = document.getElementById('btnResetFiltrosEscenario');
+  if(btnResetFiltrosEscenario) btnResetFiltrosEscenario.onclick = ()=>{
+    STATE.ui.escenarioFiltros = {cartera:'Todas', grano:'Todos', instrumento:'Todos', operacion:'Todas', mes:'Todos', anio:'Todos', precio:''};
+    render();
+  };
+
+  async function reloadSeedData(){
+    STATE.positions = SEED_POSITIONS.map(p=>({...p}));
+    STATE.priceMap = {...SEED_PRICES};
+    STATE.priceMeta = {...SEED_META};
+    STATE.scenarioPrices = {};
+    STATE.referencias = JSON.parse(JSON.stringify(SEED_REFERENCIAS));
+    STATE.seedOutdated = false;
+    await savePositions();
+    await savePrices();
+    await saveScenarios();
+    await saveReferencias();
+    try{ await storageAdapter.set(STORAGE_KEY_SEED_VERSION, SEED_VERSION); }catch(e){}
+    render();
+    toast('Datos originales del Excel recargados.');
+  }
+
+  const btnReloadSeed = document.getElementById('btnReloadSeed');
+  if(btnReloadSeed) btnReloadSeed.onclick = ()=>{
+    askConfirm('¿Reemplazar todo lo cargado en este navegador por los datos originales del archivo MTR_Rofex_Posi.xlsx? No se puede deshacer.', reloadSeedData);
+  };
+
+  const btnBannerReload = document.getElementById('btnBannerReload');
+  if(btnBannerReload) btnBannerReload.onclick = ()=>{
+    askConfirm('¿Reemplazar todo lo cargado en este navegador por los datos originales del archivo MTR_Rofex_Posi.xlsx? No se puede deshacer.', reloadSeedData);
+  };
+  const btnBannerDismiss = document.getElementById('btnBannerDismiss');
+  if(btnBannerDismiss) btnBannerDismiss.onclick = async ()=>{
+    STATE.seedOutdated = false;
+    try{ await storageAdapter.set(STORAGE_KEY_SEED_VERSION, SEED_VERSION); }catch(e){}
+    render();
+  };
+
+  const btnResetAll = document.getElementById('btnResetAll');
+  if(btnResetAll) btnResetAll.onclick = ()=>{
+    askConfirm('¿Vaciar todas las posiciones, precios y escenarios cargados? No se puede deshacer.', async ()=>{
+      STATE.positions = [];
+      STATE.priceMap = {};
+      STATE.priceMeta = {fecha:null, fuente:null};
+      STATE.scenarioPrices = {};
+      STATE.referencias = {};
+      await savePositions();
+      await savePrices();
+      await saveScenarios();
+      await saveReferencias();
+      render();
+      toast('Datos vaciados.');
+    });
+  };
+
+  // import
+  const dz = document.getElementById('dropzone');
+  const fi = document.getElementById('fileInput');
+  if(dz){
+    dz.onclick = ()=> fi.click();
+    dz.ondragover = e=>{ e.preventDefault(); dz.classList.add('drag'); };
+    dz.ondragleave = ()=> dz.classList.remove('drag');
+    dz.ondrop = e=>{ e.preventDefault(); dz.classList.remove('drag'); if(e.dataTransfer.files.length) processFiles(e.dataTransfer.files); };
+  }
+  if(fi) fi.onchange = e=>{ if(e.target.files.length) processFiles(e.target.files); };
+
+  const btnActualizarVista = document.getElementById('btnActualizarVista');
+  if(btnActualizarVista) btnActualizarVista.onclick = ()=>{ render(); toast('Vista actualizada.'); };
+}
+
+/* =========================================================================
+   INIT
+========================================================================= */
+(async function init(){
+  document.getElementById('app').innerHTML = `<div style="padding:60px;text-align:center;width:100%;color:#5B6B63;">Cargando…</div>`;
+  await loadState();
+  render();
+})();
+</script>
+</body>
+</html>
