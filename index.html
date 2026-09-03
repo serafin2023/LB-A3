@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MTR · La Bragadense</title>
-<meta name="description" content="Dashboard de posiciones y precios MTR / Rofex para La Bragadense">
-<meta property="og:title" content="MTR · La Bragadense">
-<meta property="og:description" content="Dashboard de posiciones y precios MTR / Rofex para La Bragadense">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -2196,6 +2193,41 @@ function wireEvents(){
   await loadState();
   render();
 })();
+</script>
+<form id="loginForm">
+  <input id="email" type="email" placeholder="Usuario" required>
+  <input id="pass" type="password" placeholder="Contraseña" required>
+  <button type="submit">Entrar</button>
+</form>
+
+<div id="contenido" style="display:none">
+  <!-- Acá va TODO el contenido que ya tenías en tu página -->
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_AUTHDOMAIN",
+    projectId: "TU_PROJECTID"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  document.getElementById("loginForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const email = document.getElementById("email").value;
+    const pass = document.getElementById("pass").value;
+    signInWithEmailAndPassword(auth, email, pass)
+      .then(() => {
+        document.getElementById("loginForm").style.display = "none";
+        document.getElementById("contenido").style.display = "block";
+      })
+      .catch(() => alert("Usuario o contraseña incorrectos"));
+  });
 </script>
 </body>
 </html>
