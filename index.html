@@ -1209,7 +1209,7 @@ function resumenFiltrosBarHTML(){
   </div>`;
 }
 
-function posicionNetaBadgesHTML(positions, overrides, excluirOpciones){
+function posicionNetaBadgesHTML(positions, overrides, excluirOpciones, contextoEtiqueta){
   const granosBase = ['Soja','Maiz','Trigo'];
   const extra = Array.from(new Set(positions.map(p=>p.grano))).filter(g=>g && !granosBase.includes(g)).sort();
   const granos = [...granosBase, ...extra];
@@ -1255,8 +1255,13 @@ function posicionNetaBadgesHTML(positions, overrides, excluirOpciones){
 
   const totalCls = totalUSD>0?'val-gain':(totalUSD<0?'val-loss':'');
   const totalBg = totalUSD>0?'var(--gain-bg)':(totalUSD<0?'var(--loss-bg)':'#EEF1EE');
+  const etiquetaTotal = contextoEtiqueta
+    ? (contextoEtiqueta.esEscenario
+        ? `DIFERENCIA DIARIA — ESCENARIO ${contextoEtiqueta.valorPorcentaje>=0?'+':''}${contextoEtiqueta.valorPorcentaje||0}%`
+        : `DIFERENCIA DIARIA${contextoEtiqueta.fecha? ' — '+contextoEtiqueta.fecha : ''}`)
+    : 'RESULTADO TOTAL';
   const totalCard = `<div style="background:${totalBg};border:1.5px solid #B9C4B4;border-radius:10px;padding:18px 20px;min-width:210px;flex:1;max-width:260px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;box-shadow:0 1px 3px rgba(16,35,31,.08);">
-    <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;">RESULTADO TOTAL</div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;">${etiquetaTotal}</div>
     <div style="font-size:24px;font-weight:800;margin-top:6px;" class="${totalCls}">${totalUSD>=0?'+':''}${fmtMoney(totalUSD,0)} USD</div>
     <div class="small-muted" style="margin-top:4px;">${positions.length} posiciones</div>
   </div>`;
@@ -1328,7 +1333,11 @@ function renderDashboard(){
     </div>`;
 
   return `
-  ${posicionNetaBadgesHTML(filtradas, totalesResumen, true)}
+  ${(()=>{
+    const {fechaHoy: fechaBadgeResumen} = obtenerFechasReferenciaFuturos(filtradas);
+    const contextoBadgeResumen = {esEscenario: dResumen.modo==='porcentaje', valorPorcentaje: dResumen.valorPorcentaje, fecha: fmtFechaCorta(fechaBadgeResumen)};
+    return posicionNetaBadgesHTML(filtradas, totalesResumen, true, contextoBadgeResumen);
+  })()}
   ${analisisDiferenciasDiariasHTML(filtradas, 'diffDiariaResumen', 'dfr')}
   ${resumenFiltrosBarHTML()}
   <div class="grid-2" style="${(!mostrarAcopio || !mostrarSiembras)?'grid-template-columns:1fr;':''}">
@@ -1923,8 +1932,10 @@ function renderPrincipal(){
     const r = pnlSegunModoDiario(p, d, granoActivo, vencimientoActivo, overrides);
     if(r) totalesParaBadges.set(p.id, r);
   });
+  const {fechaHoy: fechaBadgePrincipal} = obtenerFechasReferenciaFuturos(list);
+  const contextoBadgePrincipal = {esEscenario: d.modo==='porcentaje', valorPorcentaje: d.valorPorcentaje, fecha: fmtFechaCorta(fechaBadgePrincipal)};
   return `
-  ${posicionNetaBadgesHTML(enrichedList, totalesParaBadges, true)}
+  ${posicionNetaBadgesHTML(enrichedList, totalesParaBadges, true, contextoBadgePrincipal)}
   ${analisisDiferenciasDiariasHTML(list, 'diffDiaria', 'diff')}
   <div class="card">
     <div class="card-head">
