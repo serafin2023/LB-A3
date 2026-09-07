@@ -14,6 +14,10 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+app.get(['/descargar', '/descargar-html', '/download'], (req, res) => {
+  res.download(path.join(__dirname, 'index.html'), 'mtr-la-bragadense.html');
+});
+
 app.use(express.static(__dirname));
 
 app.get('*', (req, res) => {
