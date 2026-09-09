@@ -317,6 +317,7 @@ let STATE = {
     principalFiltros: {cartera:'Todas', grano:'Todos', instrumento:'Todos', operacion:'Todas', mes:'Todos', anio:'Todos', precio:''},
     diffDiaria: {modo:'real', valorPrecio:'', valorPorcentaje:'', granoSel:'', vencimientoSel:''},
     diffDiariaHistorialFecha: '',
+    curvaExpandida: false,
     diffDiariaResumen: {modo:'real', valorPrecio:'', valorPorcentaje:'', granoSel:'', vencimientoSel:''},
     editingPosition:null,   // objeto en edición o null
     modalEstrategiaMode:false,
@@ -1618,6 +1619,67 @@ function calcularResultadoFuturoDiario(fut, callsAsociados, modo, valor){
   return null;
 }
 
+function mergearCallsPorStrike(calls){
+  // Junta las toneladas de Calls que compartan el MISMO strike (y ya vienen del mismo grano/mes,
+  // porque se arman dentro de un grupo ya filtrado por eso). Calls de distinto strike NUNCA se
+  // suman entre sí — quedan como escalones separados.
+  const porStrike = {};
+  calls.forEach(c=>{
+    const k = Number(c.strike);
+    porStrike[k] = (porStrike[k]||0) + Number(c.toneladas||0);
+  });
+  return Object.keys(porStrike).map(k=>({strike:Number(k), toneladas:porStrike[k]}));
+}
+function asignarCoberturaVirtual(futurosOrdenadosPorApertura, callsOrdenadosPorStrike){
+  // Reparte una cola COMPARTIDA de Calls (ya ordenados por strike ascendente) entre varios Futuros
+  // (ya ordenados por apertura ascendente: el de apertura más baja se sirve primero). Cada futuro
+  // consume calls en orden de strike hasta cubrir su propio tonelaje; lo que no alcanza a cubrir
+  // queda sin tope (se resuelve aparte, comparando directo contra el cierre). Devuelve un Map:
+  // futuro.id -> [{strike, toneladas}] con la porción de calls que le toca a ESE futuro puntual.
+  const resultado = new Map();
+  const cola = callsOrdenadosPorStrike.map(c=>({strike:c.strike, disponible:Number(c.toneladas)}));
+  let idx = 0;
+  futurosOrdenadosPorApertura.forEach(fut=>{
+    let restante = Number(fut.toneladas);
+    const asignados = [];
+    while(restante>0.0001 && idx<cola.length){
+      const c = cola[idx];
+      const usar = Math.min(c.disponible, restante);
+      if(usar>0.0001){
+        asignados.push({strike:c.strike, toneladas:usar});
+        c.disponible -= usar;
+        restante -= usar;
+      }
+      if(c.disponible<=0.0001) idx++;
+    }
+    resultado.set(fut.id, asignados);
+  });
+  return resultado;
+}
+
+function calcularResultadoFuturosCombinados(futurosVenta, callsCompraMerged, modo, valor){
+  // Combina varios Futuros Venta sueltos del mismo grano+vencimiento en UN futuro virtual: toneladas
+  // sumadas, apertura ponderada por tonelaje. Se calcula el resultado UNA sola vez (con el mismo
+  // motor de tramos de siempre) y se reparte proporcional al tonelaje real de cada uno, para que la
+  // tabla siga sumando exacto al total.
+  const resultado = new Map();
+  if(!futurosVenta.length) return resultado;
+  const tnTotal = futurosVenta.reduce((a,f)=>a+Number(f.toneladas||0), 0);
+  if(tnTotal<=0) return resultado;
+  const aperturaPonderada = futurosVenta.reduce((a,f)=>a+Number(f.apertura)*Number(f.toneladas||0), 0) / tnTotal;
+  const futuroVirtual = {
+    instrumento:'Futuro', operacion:'Venta', grano:futurosVenta[0].grano, vencimiento:futurosVenta[0].vencimiento,
+    toneladas: tnTotal, apertura: aperturaPonderada
+  };
+  const r = calcularResultadoFuturoDiario(futuroVirtual, callsCompraMerged, modo, valor);
+  if(!r) return resultado;
+  futurosVenta.forEach(f=>{
+    const proporcion = Number(f.toneladas||0) / tnTotal;
+    resultado.set(f.id, {...r, pnl: r.pnl * proporcion});
+  });
+  return resultado;
+}
+
 function tramosPutSinteticoPorPosicion(d, granoActivo, vencimientoActivo){
   // "Diferencias diarias" se calcula ÚNICAMENTE sobre Futuros — nunca sobre Calls ni Puts por separado.
   // Cuando un Futuro tiene Calls comprados asociados (misma estrategia), sus strikes topan el cálculo
@@ -1628,7 +1690,10 @@ function tramosPutSinteticoPorPosicion(d, granoActivo, vencimientoActivo){
   const abiertas = STATE.positions.filter(p=>p.estado==='Abierta');
   const porGrupo = {};
   abiertas.forEach(p=>{
-    const k = p.estrategiaId || ('__suelto_'+p.id);
+    // Con estrategia formal: se agrupa por esa estrategia, como siempre.
+    // Sin estrategia (suelta): se agrupa por Grano+Vencimiento, para que un Futuro suelto se pueda
+    // combinar con Calls sueltos del mismo mes (como si fuese un Put Sintético armado a mano).
+    const k = p.estrategiaId || ('__suelto_'+p.grano+'|'+p.vencimiento);
     (porGrupo[k] = porGrupo[k]||[]).push(p);
   });
 
@@ -1637,13 +1702,25 @@ function tramosPutSinteticoPorPosicion(d, granoActivo, vencimientoActivo){
   const hayValor = valorEfectivo!=='' && valorEfectivo!==null && valorEfectivo!==undefined && !isNaN(Number(valorEfectivo));
 
   Object.values(porGrupo).forEach(legs=>{
-    const futuros = legs.filter(p=>p.instrumento==='Futuro');
-    const calls = legs.filter(p=>p.instrumento==='Opcion' && p.tipoOpcion==='Call' && p.operacion==='Compra');
-    futuros.forEach(fut=>{
+    const futurosVenta = legs.filter(p=>p.instrumento==='Futuro' && p.operacion==='Venta');
+    const futurosCompra = legs.filter(p=>p.instrumento==='Futuro' && p.operacion==='Compra');
+    const callsCompraRaw = legs.filter(p=>p.instrumento==='Opcion' && p.tipoOpcion==='Call' && p.operacion==='Compra');
+    const callsCompraMerged = mergearCallsPorStrike(callsCompraRaw).sort((a,b)=>a.strike-b.strike);
+
+    const resolverModo = (fut)=>{
       let modoDeEsteFuturo = modoBase;
       if(d.modo==='precio' && !(hayValor && fut.grano===granoActivo && fut.vencimiento===vencimientoActivo)) modoDeEsteFuturo = 'real';
       else if(d.modo==='porcentaje' && !hayValor) modoDeEsteFuturo = 'real';
-      const r = calcularResultadoFuturoDiario(fut, calls, modoDeEsteFuturo, valorEfectivo);
+      return modoDeEsteFuturo;
+    };
+
+    if(futurosVenta.length){
+      const modoDelGrupo = resolverModo(futurosVenta[0]);
+      const combinados = calcularResultadoFuturosCombinados(futurosVenta, callsCompraMerged, modoDelGrupo, valorEfectivo);
+      combinados.forEach((r, id)=> overrides.set(id, r));
+    }
+    futurosCompra.forEach(fut=>{
+      const r = calcularResultadoFuturoDiario(fut, [], resolverModo(fut), valorEfectivo); // Futuro Compra: nunca se topa
       if(r) overrides.set(fut.id, r);
     });
   });
@@ -1737,17 +1814,27 @@ function tramosPutSinteticoResumen(d, granoActivo, vencimientoActivo){
   const overrides = new Map();
   const abiertas = STATE.positions.filter(p=>p.estado==='Abierta');
   const porGrupo = {};
-  abiertas.forEach(p=>{ const k = p.estrategiaId || ('__suelto_'+p.id); (porGrupo[k]=porGrupo[k]||[]).push(p); });
+  abiertas.forEach(p=>{
+    const k = p.estrategiaId || ('__suelto_'+p.grano+'|'+p.vencimiento);
+    (porGrupo[k]=porGrupo[k]||[]).push(p);
+  });
 
   const valorEfectivo = d.modo==='porcentaje' ? d.valorPorcentaje : '';
   const hayValor = valorEfectivo!=='' && valorEfectivo!==null && valorEfectivo!==undefined && !isNaN(Number(valorEfectivo));
   const modoEfectivo = (d.modo==='porcentaje' && !hayValor) ? 'real' : d.modo;
 
   Object.values(porGrupo).forEach(legs=>{
-    const futuros = legs.filter(p=>p.instrumento==='Futuro');
-    const calls = legs.filter(p=>p.instrumento==='Opcion' && p.tipoOpcion==='Call' && p.operacion==='Compra');
-    futuros.forEach(fut=>{
-      const r = calcularResultadoFuturoDiario(fut, calls, modoEfectivo, valorEfectivo);
+    const futurosVenta = legs.filter(p=>p.instrumento==='Futuro' && p.operacion==='Venta');
+    const futurosCompra = legs.filter(p=>p.instrumento==='Futuro' && p.operacion==='Compra');
+    const callsCompraRaw = legs.filter(p=>p.instrumento==='Opcion' && p.tipoOpcion==='Call' && p.operacion==='Compra');
+    const callsCompraMerged = mergearCallsPorStrike(callsCompraRaw).sort((a,b)=>a.strike-b.strike);
+
+    if(futurosVenta.length){
+      const combinados = calcularResultadoFuturosCombinados(futurosVenta, callsCompraMerged, modoEfectivo, valorEfectivo);
+      combinados.forEach((r, id)=> overrides.set(id, r));
+    }
+    futurosCompra.forEach(fut=>{
+      const r = calcularResultadoFuturoDiario(fut, [], modoEfectivo, valorEfectivo);
       if(r) overrides.set(fut.id, r);
     });
   });
@@ -1796,6 +1883,123 @@ function fmtFechaCorta(iso){
   return partes.length===3 ? `${partes[2]}/${partes[1]}` : iso;
 }
 
+function calcularCurvaEscenarios(list, motorResumen){
+  // Devuelve [{pct, total}] para pct = -20..20 (de a 1), usando el mismo motor y fórmula que ya
+  // se usa para el escenario %, sin importar qué % esté cargado en el input.
+  const puntos = [];
+  for(let pct=-20; pct<=20; pct++){
+    const d = {modo:'porcentaje', valorPorcentaje: pct, valorPrecio:'', granoSel:'', vencimientoSel:''};
+    const r = motorResumen ? calcularDiferenciasDiariasResumen(list, d, '', '') : calcularDiferenciasDiarias(list, d, '', '');
+    puntos.push({pct, total: r ? r.total : 0});
+  }
+  return puntos;
+}
+function curvaExpandidaModalHTML(){
+  const list = filteredPrincipal();
+  const d = STATE.ui.diffDiaria;
+  const {granoActivo, vencimientoActivo} = resolverGranoVencimientoActivos(list, d);
+  const resultado = calcularDiferenciasDiarias(list, d, granoActivo, vencimientoActivo);
+  const {fechaHoy: fechaUltimoCierre, fechaAyer} = obtenerFechasReferenciaFuturos(list);
+  const fechaUltimoCierreFmt = fmtFechaCorta(fechaUltimoCierre) || 'sin fecha';
+  const etiquetaFechaResultado = d.modo==='porcentaje'
+    ? `Resultado del escenario (${d.valorPorcentaje>=0?'+':''}${d.valorPorcentaje||0}%) vs. el cierre del ${fechaUltimoCierreFmt}`
+    : `Resultado del ${fechaUltimoCierreFmt}`;
+  const curva = calcularCurvaEscenarios(list, false);
+
+  const etiquetaBase = d.modo==='real'
+    ? `Acumulado al ${fmtFechaCorta(fechaAyer)||'día anterior'}`
+    : `Acumulado al ${fechaUltimoCierreFmt} (apertura vs. cierre actual)`;
+  const etiquetaNueva = d.modo==='real'
+    ? `Acumulado al ${fechaUltimoCierreFmt}`
+    : `Cierre actual vs. escenario (${d.valorPorcentaje>=0?'+':''}${d.valorPorcentaje}%)`;
+
+  return `
+  <div class="modal-backdrop" id="curvaModalBackdrop">
+    <div class="modal" style="max-width:900px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+        <div>
+          <h3>Curva de escenarios</h3>
+          <div class="modal-sub">Cómo cambiaría el resultado según distintas variaciones % del mercado, de -20% a +20%.</div>
+        </div>
+        <button class="icon-btn" title="Cerrar" id="btnCerrarCurvaModal">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div style="display:flex;gap:6px;margin:14px 0 10px;">
+        <button class="btn ${d.modo==='real'?'btn-primary':'btn-ghost'} btn-sm" id="curvaModalModoReal" type="button">Cierre total</button>
+        <button class="btn ${d.modo==='porcentaje'?'btn-primary':'btn-ghost'} btn-sm" id="curvaModalModoPorcentaje" type="button">% ↓↑</button>
+        ${d.modo==='porcentaje' ? `
+        <label class="field" style="margin-left:8px;">
+          <input type="number" step="0.1" id="curvaModalValorPorcentaje" value="${d.valorPorcentaje}" placeholder="ej: 2 o -2" style="width:110px;">
+        </label>` : ''}
+      </div>
+
+      <div style="padding:14px 18px;border-radius:8px;background:${resultado.total>=0?'var(--gain-bg)':'var(--loss-bg)'};margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--teal-ink);margin-bottom:2px;">${etiquetaFechaResultado}</div>
+        <div style="font-size:22px;font-weight:800;" class="${resultado.total>=0?'val-gain':'val-loss'}">${resultado.total>=0?'+':''}${fmtMoney(resultado.total,0)} USD</div>
+        <div class="small-muted" style="margin-top:6px;font-size:11.5px;">
+          Cómo se compone: ${etiquetaBase} <strong>${fmtMoney(resultado.totalBase,0)}</strong> → ${etiquetaNueva} <strong>${fmtMoney(resultado.totalNuevo,0)}</strong> → Resultado <strong>${resultado.total>=0?'+':''}${fmtMoney(resultado.total,0)}</strong>
+        </div>
+      </div>
+
+      ${graficoCurvaEscenariosHTML(curva, d.modo==='porcentaje'?d.valorPorcentaje:null, {W:820, H:420, padL:70, radioBase:2.2, radioCero:4, fontEjes:12})}
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnCerrarCurvaModal2">Cerrar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function graficoCurvaEscenariosHTML(puntos, valorPorcentajeActivo, opts){
+  opts = opts || {};
+  const W = opts.W || 400, H = opts.H || 280, padL = opts.padL || 55, padR = 16, padT = 14, padB = 28;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const valores = puntos.map(p=>p.total);
+  const maxAbs = Math.max(1, ...valores.map(v=>Math.abs(v)));
+  const yMax = maxAbs * 1.1, yMin = -yMax;
+  const xFor = i => padL + (i/(puntos.length-1)) * innerW;
+  const yFor = v => padT + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
+  const yZero = yFor(0);
+
+  const pathD = puntos.map((p,i)=> `${i===0?'M':'L'} ${xFor(i).toFixed(1)} ${yFor(p.total).toFixed(1)}`).join(' ');
+
+  // Punto activo: el % que está cargado en el input (si corresponde), para ubicarlo en la curva.
+  const idxActivo = (valorPorcentajeActivo!==null && valorPorcentajeActivo!==undefined && valorPorcentajeActivo!=='' && !isNaN(Number(valorPorcentajeActivo)))
+    ? puntos.findIndex(p=>p.pct===Math.round(Number(valorPorcentajeActivo))) : -1;
+
+  const etiquetasX = puntos.filter(p=>p.pct % 5 === 0);
+  const radioBase = opts.radioBase || 1.4, radioCero = opts.radioCero || 2.5, fontEjes = opts.fontEjes || 9;
+
+  return `
+  <div style="min-width:${W}px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div class="small-muted" style="font-weight:700;">Curva de escenarios (-20% a +20%)</div>
+      ${opts.botonExpandir ? `
+      <button class="icon-btn" title="Ver más grande" onclick="STATE.ui.curvaExpandida=true; render();" style="display:flex;align-items:center;gap:4px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+      </button>` : ''}
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block;">
+      <line x1="${padL}" y1="${yZero.toFixed(1)}" x2="${W-padR}" y2="${yZero.toFixed(1)}" stroke="#B9C4B4" stroke-width="1"/>
+      ${etiquetasX.map(p=>{
+        const i = puntos.indexOf(p);
+        const x = xFor(i);
+        return `<line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${H-padB}" stroke="#E4E9E1" stroke-width="1"/>
+                <text x="${x.toFixed(1)}" y="${H-padB+14}" font-size="${fontEjes}" fill="var(--muted)" text-anchor="middle">${p.pct>0?'+':''}${p.pct}%</text>`;
+      }).join('')}
+      <text x="${padL-6}" y="${(padT+4).toFixed(1)}" font-size="${fontEjes}" fill="var(--muted)" text-anchor="end">${fmtMoney(yMax,0)}</text>
+      <text x="${padL-6}" y="${yZero.toFixed(1)}" font-size="${fontEjes}" fill="var(--muted)" text-anchor="end">0</text>
+      <text x="${padL-6}" y="${(H-padB).toFixed(1)}" font-size="${fontEjes}" fill="var(--muted)" text-anchor="end">${fmtMoney(yMin,0)}</text>
+      <path d="${pathD}" fill="none" stroke="var(--teal-ink)" stroke-width="2"/>
+      ${puntos.map((p,i)=> `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(p.total).toFixed(1)}" r="${p.pct===0?radioCero:radioBase}" fill="${p.total>=0?'#2F7D5A':'#B23B3B'}"/>`).join('')}
+      ${idxActivo>=0 ? `<circle cx="${xFor(idxActivo).toFixed(1)}" cy="${yFor(puntos[idxActivo].total).toFixed(1)}" r="${radioCero+2}" fill="none" stroke="#111" stroke-width="1.5"/>` : ''}
+    </svg>
+    <div class="small-muted" style="margin-top:4px;font-size:11px;">Eje X: variación % vs. el último cierre · Eje Y: Resultado total (USD)</div>
+  </div>`;
+}
+
 function analisisDiferenciasDiariasHTML(list, stateKey, idPrefix){
   stateKey = stateKey || 'diffDiaria';
   idPrefix = idPrefix || 'diff';
@@ -1825,10 +2029,13 @@ function analisisDiferenciasDiariasHTML(list, stateKey, idPrefix){
     : (d.modo==='porcentaje'
         ? `Resultado del escenario (${d.valorPorcentaje>=0?'+':''}${d.valorPorcentaje||0}%) vs. el cierre del ${fechaUltimoCierreFmt}`
         : `Resultado del ${fechaUltimoCierreFmt}`);
+  const curvaEscenarios = !motorResumen ? calcularCurvaEscenarios(list, motorResumen) : null;
   return `
   <div class="card" style="margin-bottom:16px;">
     <div class="card-head"><h2>Análisis diferencias diarias</h2></div>
     <div class="card-body">
+    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+    <div style="flex:2;min-width:300px;">
       <p class="small-muted">Elegí cómo evaluar (contra el cierre real de hoy, o un escenario hipotético en %) y mirá el flujo de caja resultante — este mismo total es el que ves en "Result. USD" de las tablas de abajo.</p>
       ${tieneHistorial ? `
       <div class="filters" style="align-items:flex-end;margin-bottom:6px;">
@@ -1906,6 +2113,9 @@ function analisisDiferenciasDiariasHTML(list, stateKey, idPrefix){
         </div>
       ` : `<div class="small-muted" style="margin-top:14px;">${sinGranoParaPrecio ? 'No hay posiciones de futuro (con estos filtros) para elegir grano y posición.' : 'Ingresá un valor para calcular.'}</div>`}
       `}
+    </div>
+    ${curvaEscenarios ? graficoCurvaEscenariosHTML(curvaEscenarios, d.modo==='porcentaje'?d.valorPorcentaje:null, {botonExpandir:true}) : ''}
+    </div>
     </div>
   </div>`;
 }
@@ -2597,6 +2807,7 @@ function render(){
     ${STATE.ui.editingPosition!==null && STATE.ui.editingPosition!=='close' ? renderPositionModal() : ''}
     ${STATE.ui.closingPosition ? closeFormHTML(STATE.ui.closingPosition) : ''}
     ${pendingConfirmAction ? confirmModalHTML() : ''}
+    ${STATE.ui.curvaExpandida ? curvaExpandidaModalHTML() : ''}
   `;
   wireEvents();
 }
@@ -2724,6 +2935,13 @@ function wireEvents(){
   }
   wireDiffDiariaGenerico('diff', STATE.ui.diffDiaria);
   wireDiffDiariaGenerico('dfr', STATE.ui.diffDiariaResumen);
+  wireDiffDiariaGenerico('curvaModal', STATE.ui.diffDiaria);
+  const btnCerrarCurvaModal = document.getElementById('btnCerrarCurvaModal');
+  if(btnCerrarCurvaModal) btnCerrarCurvaModal.onclick = ()=>{ STATE.ui.curvaExpandida=false; render(); };
+  const btnCerrarCurvaModal2 = document.getElementById('btnCerrarCurvaModal2');
+  if(btnCerrarCurvaModal2) btnCerrarCurvaModal2.onclick = ()=>{ STATE.ui.curvaExpandida=false; render(); };
+  const curvaModalBackdrop = document.getElementById('curvaModalBackdrop');
+  if(curvaModalBackdrop) curvaModalBackdrop.onclick = e=>{ if(e.target.id==='curvaModalBackdrop'){ STATE.ui.curvaExpandida=false; render(); } };
   const diffHistorialFecha = document.getElementById('diffHistorialFecha');
   if(diffHistorialFecha) diffHistorialFecha.onchange = e=>{ STATE.ui.diffDiariaHistorialFecha = e.target.value; render(); };
 
