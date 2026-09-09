@@ -1222,11 +1222,10 @@ function posicionNetaBadgesHTML(positions, overrides, excluirOpciones, contextoE
     return net;
   }
   function filaInstrumento(label, lista){
-    if(!lista.length) return '';
     const val = netDe(lista);
     const comprado = val>0, vendido = val<0;
     const color = comprado?'var(--gain)':(vendido?'var(--loss)':'var(--muted)');
-    const etiqueta = comprado?'Comprado':(vendido?'Vendido':'Neutro');
+    const etiqueta = comprado?'Comprado':(vendido?'Vendido':'-');
     return `<div style="display:flex;justify-content:space-between;gap:10px;font-size:15.5px;padding:7px 0;border-top:1.5px solid #C7D1C2;">
       <span style="color:var(--muted);font-weight:600;">${label}</span>
       <span style="color:${color};font-weight:700;">${etiqueta}${val!==0?` · ${fmtTns(Math.abs(val))} tn`:''}</span>
@@ -1245,12 +1244,20 @@ function posicionNetaBadgesHTML(positions, overrides, excluirOpciones, contextoE
     const futuros = deGrano.filter(p=>p.instrumento==='Futuro');
     const calls = deGrano.filter(p=>p.instrumento==='Opcion' && p.tipoOpcion==='Call');
     const puts = deGrano.filter(p=>p.instrumento==='Opcion' && p.tipoOpcion==='Put');
+    const netGeneral = netDe(deGrano);
+    const compradoGeneral = netGeneral>0, vendidoGeneral = netGeneral<0;
+    const colorGeneral = compradoGeneral?'var(--gain)':(vendidoGeneral?'var(--loss)':'var(--muted)');
+    const etiquetaGeneral = compradoGeneral?'Comprado':(vendidoGeneral?'Vendido':'-');
     return `<div style="background:var(--surface);border:1.5px solid #B9C4B4;border-radius:10px;padding:18px 20px;min-width:230px;flex:1;max-width:300px;box-shadow:0 1px 3px rgba(16,35,31,.08);">
       <div style="font-size:22px;font-weight:800;color:var(--teal-ink);letter-spacing:.5px;text-align:center;">${g.toUpperCase()}</div>
       <div style="margin-top:10px;">
         ${filaInstrumento('Futuro', futuros)}
         ${filaInstrumento('Call', calls)}
         ${filaInstrumento('Put', puts)}
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:2px solid #A8B5A2;text-align:center;">
+        <span style="color:${colorGeneral};font-weight:700;font-size:15.5px;">${etiquetaGeneral}</span>
+        ${netGeneral!==0?`<span style="color:${colorGeneral};font-weight:600;font-size:13px;"> · ${fmtTns(Math.abs(netGeneral))} tn</span>`:''}
       </div>
     </div>`;
   }).join('');
