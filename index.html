@@ -1630,7 +1630,7 @@ function calcularResultadoFuturoDiario(fut, callsAsociados, modo, valor, overrid
   }
   if(modo==='porcentaje'){
     // Resultado = (cierre actual vs. escenario) − (apertura vs. cierre actual = "cierre anterior").
-    if(valor===''||valor===null||valor===undefined||isNaN(Number(valor))) return null;
+    if(valor===''||valor===null||valor===undefined||isNaN(Number(valor))||Number(valor)===0) return null;
     const v = Number(valor);
     const P_eval = hoy*(1+v/100);
     const pnlHoyVsEscenario = pnlTramoFuturo(fut, callsAsociados, hoy, P_eval);
@@ -1814,7 +1814,7 @@ function calcularResultadoOpcionDiario(p, modo, valor){
     return {pnl, ref:base, eval:hoy, esEscenario:false, pnlBase, pnlNuevo};
   }
   if(modo==='porcentaje'){
-    if(valor===''||valor===null||valor===undefined||isNaN(Number(valor))) return null;
+    if(valor===''||valor===null||valor===undefined||isNaN(Number(valor))||Number(valor)===0) return null;
     const v = Number(valor);
     // Mismo criterio que en Principal: el % se aplica sobre la prima de hoy; en los Puts el signo
     // se invierte (si el mercado sube, el Put pierde valor).
@@ -1907,10 +1907,13 @@ function fmtFechaCorta(iso){
 
 function calcularCurvaEscenarios(list, motorResumen){
   // Devuelve [{pct, total}] para pct = -20..20 (de a 1), usando el mismo motor y fórmula que ya
-  // se usa para el escenario %, sin importar qué % esté cargado en el input.
+  // se usa para el escenario %, sin importar qué % esté cargado en el input. En pct=0 se usa un
+  // valor infinitesimal (no exactamente 0) solo para este gráfico, así la curva se ve continua —
+  // el bloqueo real de "no se puede usar 0%" sigue aplicando en el cálculo del resultado.
   const puntos = [];
   for(let pct=-20; pct<=20; pct++){
-    const d = {modo:'porcentaje', valorPorcentaje: pct, valorPrecio:'', granoSel:'', vencimientoSel:''};
+    const valorEfectivo = pct===0 ? 0.0000001 : pct;
+    const d = {modo:'porcentaje', valorPorcentaje: valorEfectivo, valorPrecio:'', granoSel:'', vencimientoSel:''};
     const r = motorResumen ? calcularDiferenciasDiariasResumen(list, d, '', '') : calcularDiferenciasDiarias(list, d, '', '');
     puntos.push({pct, total: r ? r.total : 0});
   }
@@ -2043,7 +2046,8 @@ function analisisDiferenciasDiariasHTML(list, stateKey, idPrefix){
   const {granosDisponibles, granoActivo, vencimientosDisponibles, vencimientoActivo} = resolverGranoVencimientoActivos(list, d);
 
   const sinGranoParaPrecio = d.modo==='precio' && !granoActivo;
-  const resultado = sinGranoParaPrecio ? null : (motorResumen ? calcularDiferenciasDiariasResumen(list, d, granoActivo, vencimientoActivo) : calcularDiferenciasDiarias(list, d, granoActivo, vencimientoActivo));
+  const esCeroPorciento = d.modo==='porcentaje' && d.valorPorcentaje!=='' && d.valorPorcentaje!==null && d.valorPorcentaje!==undefined && !isNaN(Number(d.valorPorcentaje)) && Number(d.valorPorcentaje)===0;
+  const resultado = (sinGranoParaPrecio||esCeroPorciento) ? null : (motorResumen ? calcularDiferenciasDiariasResumen(list, d, granoActivo, vencimientoActivo) : calcularDiferenciasDiarias(list, d, granoActivo, vencimientoActivo));
   const totalMostrado = viendoHistorial ? historial[fechaSeleccionada].total : (resultado?resultado.total:null);
   const abiertoDetalle = STATE.ui.diagnosticosAbiertos.has(diagKey);
   const etiquetaFechaResultado = viendoHistorial
@@ -2144,7 +2148,7 @@ function analisisDiferenciasDiariasHTML(list, stateKey, idPrefix){
             </table>
           </div>` : ''}
         </div>
-      ` : `<div class="small-muted" style="margin-top:14px;">${sinGranoParaPrecio ? 'No hay posiciones de futuro (con estos filtros) para elegir grano y posición.' : 'Ingresá un valor para calcular.'}</div>`}
+      ` : `<div class="small-muted" style="margin-top:14px;">${sinGranoParaPrecio ? 'No hay posiciones de futuro (con estos filtros) para elegir grano y posición.' : (esCeroPorciento ? 'El escenario no puede ser 0% (no representa ningún movimiento hipotético). Probá con otro valor, o usá "Cierre total" si querés ver el resultado real.' : 'Ingresá un valor para calcular.')}</div>`}
       `}
     </div>
     ${curvaEscenarios ? graficoCurvaEscenariosHTML(curvaEscenarios, d.modo==='porcentaje'?d.valorPorcentaje:null, {botonExpandir:true}) : ''}
