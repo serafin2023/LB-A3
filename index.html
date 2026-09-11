@@ -319,6 +319,7 @@ let STATE = {
     diffDiaria: {modo:'real', valorPrecio:'', valorPorcentaje:'', granoSel:'', vencimientoSel:''},
     diffDiariaHistorialFecha: '',
     curvaExpandida: false,
+    editandoReferencia: null,
     diffDiariaResumen: {modo:'real', valorPrecio:'', valorPorcentaje:'', granoSel:'', vencimientoSel:''},
     editingPosition:null,   // objeto en edición o null
     modalEstrategiaMode:false,
@@ -1283,7 +1284,14 @@ function posicionNetaBadgesHTML(positions, overrides, excluirOpciones, contextoE
         ? `DIFERENCIA DIARIA — ESCENARIO ${contextoEtiqueta.valorPorcentaje>=0?'+':''}${contextoEtiqueta.valorPorcentaje||0}%`
         : `DIFERENCIA DIARIA${contextoEtiqueta.fecha? ' — '+contextoEtiqueta.fecha : ''}`)
     : 'RESULTADO TOTAL';
-  const totalCard = `<div style="background:${totalBg};border:1.5px solid #B9C4B4;border-radius:10px;padding:18px 20px;min-width:210px;flex:1;max-width:260px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;box-shadow:0 1px 3px rgba(16,35,31,.08);">
+  const tieneAcumulado = contextoEtiqueta && contextoEtiqueta.acumulado!==undefined && contextoEtiqueta.acumulado!==null;
+  const acumCls = tieneAcumulado ? (contextoEtiqueta.acumulado>0?'val-gain':(contextoEtiqueta.acumulado<0?'val-loss':'')) : '';
+  const totalCard = `<div style="background:${totalBg};border:1.5px solid #B9C4B4;border-radius:10px;padding:${tieneAcumulado?'14px 20px':'18px 20px'};min-width:210px;flex:1;max-width:260px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;box-shadow:0 1px 3px rgba(16,35,31,.08);">
+    ${tieneAcumulado ? `
+    <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;">RESULTADO ACUMULADO</div>
+    <div style="font-size:20px;font-weight:800;margin-top:2px;" class="${acumCls}">${contextoEtiqueta.acumulado>=0?'+':''}${fmtMoney(contextoEtiqueta.acumulado,0)} USD</div>
+    <div style="width:100%;border-top:1.5px solid #C7D1C2;margin:10px 0 8px;"></div>
+    ` : ''}
     <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;">${etiquetaTotal}</div>
     <div style="font-size:24px;font-weight:800;margin-top:6px;" class="${totalCls}">${totalUSD>=0?'+':''}${fmtMoney(totalUSD,0)} USD</div>
     <div class="small-muted" style="margin-top:4px;">${positions.length} posiciones</div>
@@ -1377,7 +1385,6 @@ function referenciasGlosarioHTML(){
       filas.push({cartera, numero, texto});
     });
   });
-  if(!filas.length) return '';
   filas.sort((a,b)=> a.cartera.localeCompare(b.cartera) || a.numero.localeCompare(b.numero, undefined, {numeric:true}));
   const abierto = STATE.ui.diagnosticosAbiertos.has('__glosario__');
   return `
@@ -1390,16 +1397,69 @@ function referenciasGlosarioHTML(){
       ${abierto? `
       <div class="table-scroll" style="margin-top:10px;">
         <table>
-          <thead><tr><th>Cartera</th><th>Ref.</th><th>Qué es</th></tr></thead>
+          <thead><tr><th>Cartera</th><th>Ref.</th><th>Qué es</th><th></th></tr></thead>
           <tbody>
             ${filas.map(f=>`<tr>
               <td><span class="tag ${f.cartera==='Acopio'?'tag-acopio':'tag-siembras'}">${f.cartera}</span></td>
               <td class="small-muted">${f.numero}</td>
               <td>${f.texto}</td>
+              <td style="white-space:nowrap;">
+                <button class="icon-btn" title="Editar" onclick="openEditReferencia('${f.cartera}','${f.numero.replace(/'/g,"\\'")}')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+                </button>
+                <button class="icon-btn" title="Eliminar" onclick="eliminarReferencia('${f.cartera}','${f.numero.replace(/'/g,"\\'")}')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-1 0v14a1 1 0 01-1 1H9a1 1 0 01-1-1V6"/></svg>
+                </button>
+              </td>
             </tr>`).join('')}
+            ${!filas.length ? `<tr><td colspan="4" class="small-muted" style="text-align:center;padding:14px;">Todavía no hay referencias cargadas.</td></tr>` : ''}
           </tbody>
         </table>
-      </div>` : ''}
+      </div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="openAddReferencia()">+ Agregar referencia</button>
+      ` : ''}
+    </div>
+  </div>`;
+}
+function openEditReferencia(cartera, numero){
+  const texto = (STATE.referencias[cartera]||{})[numero] || '';
+  STATE.ui.editandoReferencia = {cartera, numero, texto, esNueva:false};
+  render();
+}
+function openAddReferencia(){
+  STATE.ui.editandoReferencia = {cartera:'Acopio', numero:'', texto:'', esNueva:true};
+  render();
+}
+function eliminarReferencia(cartera, numero){
+  askConfirm(`¿Eliminar la referencia ${numero} de ${cartera}? No se puede deshacer.`, async ()=>{
+    if(STATE.referencias[cartera]) delete STATE.referencias[cartera][numero];
+    await saveReferencias();
+    render();
+    toast('Referencia eliminada.');
+  });
+}
+function editarReferenciaModalHTML(){
+  const d = STATE.ui.editandoReferencia;
+  return `
+  <div class="modal-backdrop" id="refModalBackdrop">
+    <div class="modal" style="max-width:520px;">
+      <h3>${d.esNueva?'Agregar referencia':'Editar referencia'}</h3>
+      <label class="field">Cartera
+        <select id="refCartera" ${!d.esNueva?'disabled':''}>
+          <option value="Acopio" ${d.cartera==='Acopio'?'selected':''}>Acopio</option>
+          <option value="Siembras" ${d.cartera==='Siembras'?'selected':''}>Siembras</option>
+        </select>
+      </label>
+      <label class="field">Número de referencia (ej: 1) )
+        <input type="text" id="refNumero" value="${d.numero}" placeholder="1)" ${!d.esNueva?'disabled':''}>
+      </label>
+      <label class="field">Qué es
+        <textarea id="refTexto" rows="4" placeholder="Descripción de la referencia...">${d.texto}</textarea>
+      </label>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnCancelarReferencia">Cancelar</button>
+        <button class="btn btn-primary" id="btnGuardarReferencia">Guardar</button>
+      </div>
     </div>
   </div>`;
 }
@@ -2180,7 +2240,8 @@ function renderPrincipal(){
     if(r) totalesParaBadges.set(p.id, r);
   });
   const {fechaHoy: fechaBadgePrincipal} = obtenerFechasReferenciaFuturos(list);
-  const contextoBadgePrincipal = {esEscenario: d.modo==='porcentaje', valorPorcentaje: d.valorPorcentaje, fecha: fmtFechaCorta(fechaBadgePrincipal)};
+  const resultadoAcumulado = calcularDiferenciasDiarias(list, {modo:'real', valorPrecio:'', valorPorcentaje:'', granoSel:'', vencimientoSel:''}, granoActivo, vencimientoActivo).totalNuevo;
+  const contextoBadgePrincipal = {esEscenario: d.modo==='porcentaje', valorPorcentaje: d.valorPorcentaje, fecha: fmtFechaCorta(fechaBadgePrincipal), acumulado: resultadoAcumulado};
   return `
   ${posicionNetaBadgesHTML(enrichedList, totalesParaBadges, true, contextoBadgePrincipal)}
   ${analisisDiferenciasDiariasHTML(list, 'diffDiaria', 'diff')}
@@ -2193,7 +2254,8 @@ function renderPrincipal(){
       ${filtrosBarHTML('pr', STATE.ui.principalFiltros, 'btnResetFiltrosPrincipal')}
       ${tablaPosicionesHTML(list, escenarioCol)}
     </div>
-  </div>`;
+  </div>
+  ${referenciasGlosarioHTML()}`;
 }
 
 /* =========================================================================
@@ -2845,6 +2907,7 @@ function render(){
     ${STATE.ui.closingPosition ? closeFormHTML(STATE.ui.closingPosition) : ''}
     ${pendingConfirmAction ? confirmModalHTML() : ''}
     ${STATE.ui.curvaExpandida ? curvaExpandidaModalHTML() : ''}
+    ${STATE.ui.editandoReferencia ? editarReferenciaModalHTML() : ''}
   `;
   wireEvents();
 }
@@ -2977,6 +3040,29 @@ function wireEvents(){
   if(btnCerrarCurvaModal) btnCerrarCurvaModal.onclick = ()=>{ STATE.ui.curvaExpandida=false; render(); };
   const btnCerrarCurvaModal2 = document.getElementById('btnCerrarCurvaModal2');
   if(btnCerrarCurvaModal2) btnCerrarCurvaModal2.onclick = ()=>{ STATE.ui.curvaExpandida=false; render(); };
+
+  const btnCancelarReferencia = document.getElementById('btnCancelarReferencia');
+  if(btnCancelarReferencia) btnCancelarReferencia.onclick = ()=>{ STATE.ui.editandoReferencia=null; render(); };
+  const btnGuardarReferencia = document.getElementById('btnGuardarReferencia');
+  if(btnGuardarReferencia) btnGuardarReferencia.onclick = async ()=>{
+    const d = STATE.ui.editandoReferencia;
+    const cartera = document.getElementById('refCartera').value;
+    const numero = document.getElementById('refNumero').value.trim();
+    const texto = document.getElementById('refTexto').value.trim();
+    if(!numero){ toast('Ponele un número a la referencia (ej: 1) ).','err'); return; }
+    if(!texto){ toast('Completá qué es esta referencia.','err'); return; }
+    if(!STATE.referencias[cartera]) STATE.referencias[cartera] = {};
+    if(d.esNueva && STATE.referencias[cartera][numero]){
+      toast('Ya existe una referencia con ese número en esa cartera.','err'); return;
+    }
+    STATE.referencias[cartera][numero] = texto;
+    await saveReferencias();
+    STATE.ui.editandoReferencia = null;
+    render();
+    toast(d.esNueva ? 'Referencia agregada.' : 'Referencia actualizada.');
+  };
+  const refModalBackdrop = document.getElementById('refModalBackdrop');
+  if(refModalBackdrop) refModalBackdrop.onclick = e=>{ if(e.target.id==='refModalBackdrop'){ STATE.ui.editandoReferencia=null; render(); } };
   const curvaModalBackdrop = document.getElementById('curvaModalBackdrop');
   if(curvaModalBackdrop) curvaModalBackdrop.onclick = e=>{ if(e.target.id==='curvaModalBackdrop'){ STATE.ui.curvaExpandida=false; render(); } };
   const diffHistorialFecha = document.getElementById('diffHistorialFecha');
