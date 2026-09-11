@@ -1289,11 +1289,12 @@ function posicionNetaBadgesHTML(positions, overrides, excluirOpciones, contextoE
   const totalCard = `<div style="background:${totalBg};border:1.5px solid #B9C4B4;border-radius:10px;padding:${tieneAcumulado?'14px 20px':'18px 20px'};min-width:210px;flex:1;max-width:260px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;box-shadow:0 1px 3px rgba(16,35,31,.08);">
     ${tieneAcumulado ? `
     <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;">RESULTADO ACUMULADO</div>
-    <div style="font-size:20px;font-weight:800;margin-top:2px;" class="${acumCls}">${contextoEtiqueta.acumulado>=0?'+':''}${fmtMoney(contextoEtiqueta.acumulado,0)} USD</div>
+    <div style="font-size:10px;font-weight:600;color:var(--muted);margin-top:-1px;">de partidas abiertas</div>
+    <div style="font-size:22px;font-weight:800;margin-top:4px;" class="${acumCls}">${contextoEtiqueta.acumulado>=0?'+':''}${fmtMoney(contextoEtiqueta.acumulado,0)} USD</div>
     <div style="width:100%;border-top:1.5px solid #C7D1C2;margin:10px 0 8px;"></div>
     ` : ''}
     <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;">${etiquetaTotal}</div>
-    <div style="font-size:24px;font-weight:800;margin-top:6px;" class="${totalCls}">${totalUSD>=0?'+':''}${fmtMoney(totalUSD,0)} USD</div>
+    <div style="font-size:22px;font-weight:800;margin-top:6px;" class="${totalCls}">${totalUSD>=0?'+':''}${fmtMoney(totalUSD,0)} USD</div>
     <div class="small-muted" style="margin-top:4px;">${positions.length} posiciones</div>
   </div>`;
 
@@ -1366,7 +1367,8 @@ function renderDashboard(){
   return `
   ${(()=>{
     const {fechaHoy: fechaBadgeResumen} = obtenerFechasReferenciaFuturos(filtradas);
-    const contextoBadgeResumen = {esEscenario: dResumen.modo==='porcentaje', valorPorcentaje: dResumen.valorPorcentaje, fecha: fmtFechaCorta(fechaBadgeResumen)};
+    const acumuladoResumen = calcularDiferenciasDiariasResumen(filtradas, {modo:'real', valorPrecio:'', valorPorcentaje:'', granoSel:'', vencimientoSel:''}, granoActivoResumen, vencimientoActivoResumen).totalNuevo;
+    const contextoBadgeResumen = {esEscenario: dResumen.modo==='porcentaje', valorPorcentaje: dResumen.valorPorcentaje, fecha: fmtFechaCorta(fechaBadgeResumen), acumulado: acumuladoResumen};
     return posicionNetaBadgesHTML(filtradas, totalesResumen, true, contextoBadgeResumen);
   })()}
   ${analisisDiferenciasDiariasHTML(filtradas, 'diffDiariaResumen', 'dfr')}
