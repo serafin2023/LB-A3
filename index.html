@@ -1035,6 +1035,14 @@ function renderSidebar(){
       ${window.currentUser?.email ? `<div style="color:rgba(255,255,255,.9);margin-bottom:8px;word-break:break-all;font-size:11px;" title="${window.currentUser.email}"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:middle;"></span>${window.currentUser.email}</div>` : ''}
       Datos guardados en este navegador.<br>Última carga de precios:<br><strong style="color:#fff">${STATE.priceMeta.fecha || 'sin datos'}</strong>
     </div>
+    <a href="/descargar" download="mtr-la-bragadense.html" class="navbtn btn-descargar-html" id="btnSidebarDownload" title="Descargar este archivo HTML con los cambios recientes" style="background:rgba(164,204,57,.15);color:#fff;border:1px solid rgba(164,204,57,.35);text-decoration:none;margin-top:6px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      <span>Descargar HTML</span>
+    </a>
   </div>`;
 }
 
@@ -1238,12 +1246,17 @@ function posicionNetaBadgesHTML(positions, overrides, excluirOpciones, contextoE
   }
   function filaInstrumento(label, lista){
     const val = netDe(lista);
+    const hayPosiciones = lista.length > 0;
     const comprado = val>0, vendido = val<0;
     const color = comprado?'var(--gain)':(vendido?'var(--loss)':'var(--muted)');
-    const etiqueta = comprado?'Comprado':(vendido?'Vendido':'-');
+    const etiquetaPrincipal = comprado ? `Comprado · ${fmtTns(Math.abs(val))} tn` : (vendido ? `Vendido · ${fmtTns(Math.abs(val))} tn` : (hayPosiciones ? 'Neto 0' : '-'));
+    const notaNetoCero = (hayPosiciones && val===0) ? `<div style="font-size:10.5px;color:#AEB8AC;font-weight:500;margin-top:1px;">Hay compra y venta abiertas</div>` : '';
     return `<div style="display:flex;justify-content:space-between;gap:10px;font-size:15.5px;padding:7px 0;border-top:1.5px solid #C7D1C2;">
       <span style="color:var(--muted);font-weight:600;">${label}</span>
-      <span style="color:${color};font-weight:700;">${etiqueta}${val!==0?` · ${fmtTns(Math.abs(val))} tn`:''}</span>
+      <span style="text-align:right;">
+        <div style="color:${color};font-weight:700;">${etiquetaPrincipal}</div>
+        ${notaNetoCero}
+      </span>
     </div>`;
   }
 
@@ -2983,7 +2996,45 @@ window.openEditStrategy = openEditStrategy;
 window.deleteStrategyGroup = deleteStrategyGroup;
 window.setTab = setTab;
 
+function triggerHtmlDownload(e){
+  if(e && e.preventDefault) e.preventDefault();
+  try{
+    let html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+    // Reemplaza los datos "de fábrica" del archivo por el estado ACTUAL de la sesión (posiciones,
+    // precios, historial, referencias), para que el HTML descargado sea un snapshot fiel e
+    // independiente de lo que se ve en pantalla en este momento — no depende de localStorage.
+    const reemplazos = [
+      [/const SEED_POSITIONS = \[[\s\S]*?\];/, 'const SEED_POSITIONS = ' + JSON.stringify(STATE.positions) + ';'],
+      [/const SEED_PRICES = \{[\s\S]*?\};/, 'const SEED_PRICES = ' + JSON.stringify(STATE.priceMap) + ';'],
+      [/const SEED_META = \{[\s\S]*?\};/, 'const SEED_META = ' + JSON.stringify(STATE.priceMeta) + ';'],
+      [/const SEED_REFERENCIAS = \{[\s\S]*?\};/, 'const SEED_REFERENCIAS = ' + JSON.stringify(STATE.referencias) + ';'],
+      [/const SEED_HISTORIAL_DIFERENCIAS = \{[\s\S]*?\};/, 'const SEED_HISTORIAL_DIFERENCIAS = ' + JSON.stringify(STATE.historialDiferenciasDiarias) + ';'],
+    ];
+    reemplazos.forEach(([patron, nuevo])=>{ html = html.replace(patron, nuevo); });
+
+    const blob = new Blob([html], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mtr-la-bragadense-' + new Date().toISOString().slice(0,10) + '.html';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 1000);
+    toast('Descarga iniciada: se guardó el estado actual de la app en el archivo.');
+  }catch(err){
+    console.error(err);
+    toast('No se pudo generar la descarga.', 'err');
+  }
+}
+window.triggerHtmlDownload = triggerHtmlDownload;
+
 function wireEvents(){
+  document.querySelectorAll('.btn-descargar-html').forEach(b => {
+    b.onclick = (e) => triggerHtmlDownload(e);
+  });
   document.querySelectorAll('.navbtn[data-tab]').forEach(b=> b.onclick = ()=> setTab(b.dataset.tab));
   const btnAdd = document.getElementById('btnAddPos');
   if(btnAdd) btnAdd.onclick = openAdd;
