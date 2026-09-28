@@ -2867,7 +2867,7 @@ function editarReferenciaModalHTML(){
 function positionRow(p, override, mostrarCierreReal){
   const e = enrich(p);
   const cls = p.estado==='Cerrada' ? 'row-closed' : '';
-  let precioCierreMostrar, totalMostrar;
+  let precioCierreMostrar, totalMostrar, desglose=null;
   if(override===undefined){
     // Contexto normal (pestaña Posiciones): todo real, como siempre.
     precioCierreMostrar = e.precioUsado;
@@ -2879,6 +2879,11 @@ function positionRow(p, override, mostrarCierreReal){
   } else {
     precioCierreMostrar = override.eval;
     totalMostrar = override.pnl;
+    if(override.pnlBase!==undefined && override.pnlNuevo!==undefined){
+      desglose = override.esEscenario
+        ? `Apertura vs. cierre actual: ${fmtMoney(override.pnlBase,0)}<br>Apertura vs. escenario: ${fmtMoney(override.pnlNuevo,0)}<br>Diferencia: ${override.pnl>=0?'+':''}${fmtMoney(override.pnl,0)}`
+        : `Acumulado día anterior: ${fmtMoney(override.pnlBase,0)}<br>Acumulado hoy: ${fmtMoney(override.pnlNuevo,0)}<br>Diferencia diaria: ${override.pnl>=0?'+':''}${fmtMoney(override.pnl,0)}`;
+    }
   }
   const columnaCierreReal = mostrarCierreReal ? `<td class="num">${e.precioUsado!==null? fmtMoney(e.precioUsado,1)+(e.precioEsManual?' *':'') : '<span class="val-na">s/d</span>'}</td>` : '';
   const rowStyle = override && override.dim ? ' style="opacity:.6;"' : '';
@@ -2895,7 +2900,7 @@ function positionRow(p, override, mostrarCierreReal){
     <td class="num">${fmtMoney(p.apertura,2)}</td>
     ${columnaCierreReal}
     <td class="num">${precioCierreMostrar!==null? fmtMoney(precioCierreMostrar,1)+(e.precioEsManual?' *':'') : '<span class="val-na">s/d</span>'}</td>
-    <td class="num">${totalMostrar!==null? fmtUSD(totalMostrar) : '<span class="small-muted">—</span>'}</td>
+    <td class="num">${totalMostrar!==null? (desglose?`<span class="tooltip-wrap" data-tooltip="${desglose.replace(/"/g,'&quot;')}">${fmtUSD(totalMostrar)}</span>`:fmtUSD(totalMostrar)) : '<span class="small-muted">—</span>'}</td>
     <td>${p.estrategia?`<span class="small-muted">${p.estrategia}</span>`:''}</td>
     <td>
       <button class="icon-btn" title="Editar" onclick="openEdit('${p.id}')">
@@ -2951,7 +2956,7 @@ function tablaPosicionesHTML(list, escenarioCol){
     <table>
       <thead><tr>
         <th>Ref.</th><th>Cartera</th><th>Instr.</th><th>Grano</th><th>Op</th><th>Vto</th><th class="num">Strike</th>
-        <th class="num">Tns</th><th class="num">$ Apert.</th>${mostrarCierreExtra?'<th class="num">Cierre</th>':''}<th class="num">${headerCierre}</th><th class="num">Result. USD</th><th>Estrategia</th><th></th>
+        <th class="num">Tns</th><th class="num">$ Apert.</th>${mostrarCierreExtra?'<th class="num">Cierre</th>':''}<th class="num">${headerCierre}</th><th class="num">Dif. Diaria</th><th>Estrategia</th><th></th>
       </tr></thead>
       <tbody>
         ${list.length? list.map(p=> escenarioCol ? positionRow(p, escenarioCol.calc(p), mostrarCierreExtra) : positionRow(p)).join('') : `<tr><td colspan="13" class="small-muted" style="text-align:center;padding:24px;">No hay posiciones con estos filtros.</td></tr>`}
