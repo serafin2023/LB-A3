@@ -3585,16 +3585,16 @@ function analisisDiferenciasDiariasHTML(list, stateKey, idPrefix){
     <div class="card-body">
     <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
     <div style="flex:2;min-width:300px;">
-      <p class="small-muted">Elegí cómo evaluar (contra el cierre real de hoy, o un escenario hipotético en %) y mirá el flujo de caja resultante — este mismo total es el que ves en "Result. USD" de las tablas de abajo.</p>
       ${tieneHistorial ? `
-      <div class="filters" style="align-items:flex-end;margin-bottom:6px;">
+      <div class="filters" style="align-items:flex-end;margin-bottom:6px;gap:10px;">
         <label class="field">Ver un cierre anterior
-          <select id="${idPrefix}HistorialFecha" ${fechasDisponibles.length?'':'disabled'}>
-            <option value="">${fechasDisponibles.length? etiquetaUltimoCierre : `${etiquetaUltimoCierre} — todavía no hay historial cargado`}</option>
-            ${fechasDisponibles.map(f=>`<option value="${f}" ${fechaSeleccionada===f?'selected':''}>${f.split('-').reverse().join('/')}</option>`).join('')}
-          </select>
+          <input type="date" id="${idPrefix}HistorialFecha" value="${fechaSeleccionada}"
+            ${fechasDisponibles.length?`min="${fechasDisponibles[fechasDisponibles.length-1]}" max="${fechasDisponibles[0]}"`:''}
+            ${fechasDisponibles.length?'':'disabled'}>
         </label>
-      </div>` : ''}
+        ${fechaSeleccionada ? `<button class="btn btn-ghost btn-sm" id="${idPrefix}HistorialFechaClear">Ver ${etiquetaUltimoCierre}</button>` : ''}
+      </div>
+      ${fechaSeleccionada && !historial[fechaSeleccionada] ? `<div class="small-muted" style="color:var(--loss);margin-bottom:6px;">No hay un cierre cargado para el ${fechaSeleccionada.split('-').reverse().join('/')} — elegí otra fecha.</div>` : ''}` : ''}
       ${viendoHistorial ? `
         <div style="margin-top:8px;padding:16px 20px;border-radius:8px;background:${totalMostrado>=0?'var(--gain-bg)':'var(--loss-bg)'};">
           <div style="font-size:13px;font-weight:700;color:var(--teal-ink);margin-bottom:4px;">${etiquetaFechaResultado}</div>
@@ -4654,6 +4654,8 @@ function wireEvents(){
   if(curvaModalBackdrop) curvaModalBackdrop.onclick = e=>{ if(e.target.id==='curvaModalBackdrop'){ STATE.ui.curvaExpandida=false; render(); } };
   const diffHistorialFecha = document.getElementById('diffHistorialFecha');
   if(diffHistorialFecha) diffHistorialFecha.onchange = e=>{ STATE.ui.diffDiariaHistorialFecha = e.target.value; render(); };
+  const diffHistorialFechaClear = document.getElementById('diffHistorialFechaClear');
+  if(diffHistorialFechaClear) diffHistorialFechaClear.onclick = ()=>{ STATE.ui.diffDiariaHistorialFecha = ''; render(); };
 
   // filtros resumen
   const rfCartera = document.getElementById('rfCartera');
