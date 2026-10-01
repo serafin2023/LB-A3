@@ -3555,11 +3555,12 @@ function analisisDiferenciasDiariasHTML(list, stateKey, idPrefix){
   const diagKey = '__'+stateKey+'__';
   const motorResumen = stateKey==='diffDiariaResumen';
 
-  // Historial (solo en Principal): permite elegir una fecha pasada y ver la foto congelada de ese día.
+  // Historial: permite elegir una fecha pasada y ver la foto congelada de ese día (Principal y Resumen
+  // comparten el mismo historial de fondo, por eso el total ya coincide entre las dos pantallas).
   const historial = STATE.historialDiferenciasDiarias || {};
   const fechasDisponibles = Object.keys(historial).sort().reverse();
-  const tieneHistorial = !motorResumen;
-  const fechaSeleccionada = !motorResumen ? (STATE.ui.diffDiariaHistorialFecha||'') : '';
+  const tieneHistorial = true;
+  const fechaSeleccionada = STATE.ui.diffDiariaHistorialFecha||'';
   const viendoHistorial = tieneHistorial && fechaSeleccionada && historial[fechaSeleccionada];
   const {fechaHoy: fechaUltimoCierre} = obtenerFechasReferenciaFuturos(list);
   const fechaUltimoCierreFmt = fmtFechaCorta(fechaUltimoCierre) || 'sin fecha';
@@ -4652,10 +4653,12 @@ function wireEvents(){
   }
   const curvaModalBackdrop = document.getElementById('curvaModalBackdrop');
   if(curvaModalBackdrop) curvaModalBackdrop.onclick = e=>{ if(e.target.id==='curvaModalBackdrop'){ STATE.ui.curvaExpandida=false; render(); } };
-  const diffHistorialFecha = document.getElementById('diffHistorialFecha');
-  if(diffHistorialFecha) diffHistorialFecha.onchange = e=>{ STATE.ui.diffDiariaHistorialFecha = e.target.value; render(); };
-  const diffHistorialFechaClear = document.getElementById('diffHistorialFechaClear');
-  if(diffHistorialFechaClear) diffHistorialFechaClear.onclick = ()=>{ STATE.ui.diffDiariaHistorialFecha = ''; render(); };
+  ['diff','dfr'].forEach(prefix=>{
+    const inputFecha = document.getElementById(prefix+'HistorialFecha');
+    if(inputFecha) inputFecha.onchange = e=>{ STATE.ui.diffDiariaHistorialFecha = e.target.value; render(); };
+    const btnClear = document.getElementById(prefix+'HistorialFechaClear');
+    if(btnClear) btnClear.onclick = ()=>{ STATE.ui.diffDiariaHistorialFecha = ''; render(); };
+  });
 
   // filtros resumen
   const rfCartera = document.getElementById('rfCartera');
